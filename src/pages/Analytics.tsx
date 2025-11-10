@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
+import { useDirectusAuth } from '@/contexts/DirectusAuthContext';
 import { BottomNav } from '@/components/BottomNav';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { BarChart3, TrendingUp, Clock, Truck, Activity } from 'lucide-react';
 
 const Analytics = () => {
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading } = useDirectusAuth();
   const navigate = useNavigate();
 
   useEffect(() => {

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
+import { useDirectusAuth } from '@/contexts/DirectusAuthContext';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
+import { useVehicles } from '@/hooks/useDirectusData';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -11,31 +11,18 @@ import { BottomNav } from '@/components/BottomNav';
 import { StatusBadge } from '@/components/StatusBadge';
 import { cn } from '@/lib/utils';
 
-interface Vehicle {
-  id: string;
-  vehicle_number: string;
-  vehicle_type: string;
-  status: string;
-  location_status: string;
-  current_location?: { lat: number; lng: number };
-  assigned_driver_id?: string;
-  drivers?: {
-    full_name: string;
-    contact_number: string;
-  };
-}
-
 const VehicleTracking = () => {
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading } = useDirectusAuth();
   const navigate = useNavigate();
-  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
-  const [filteredVehicles, setFilteredVehicles] = useState<Vehicle[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: vehicles, isLoading: vehiclesLoading, refetch } = useVehicles();
+  const [filteredVehicles, setFilteredVehicles] = useState<any[]>([]);
   const [viewMode, setViewMode] = useState<'map' | 'list'>('map');
   const [filterType, setFilterType] = useState<string>('all');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [refreshing, setRefreshing] = useState(false);
-  const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
+  const [selectedVehicle, setSelectedVehicle] = useState<any>(null);
+  
+  const loading = vehiclesLoading;
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -44,49 +31,17 @@ const VehicleTracking = () => {
   }, [user, authLoading, navigate]);
 
   useEffect(() => {
-    fetchVehicles();
-  }, []);
-
-  useEffect(() => {
-    applyFilters();
+    if (vehicles) {
+      applyFilters();
+    }
   }, [vehicles, filterType, filterStatus]);
 
-  const fetchVehicles = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('vehicles')
-        .select(`
-          *,
-          drivers:assigned_driver_id (
-            full_name,
-            contact_number
-          )
-        `);
-
-      if (error) throw error;
-
-      // Simulate random GPS positions for demo
-      const vehiclesWithLocations = data?.map((v) => ({
-        ...v,
-        current_location: {
-          lat: 14.0293 + (Math.random() - 0.5) * 0.1,
-          lng: 121.5920 + (Math.random() - 0.5) * 0.1,
-        },
-      })) || [];
-
-      setVehicles(vehiclesWithLocations);
-    } catch (error) {
-      console.error('Error fetching vehicles:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const applyFilters = () => {
+    if (!vehicles) return;
     let filtered = [...vehicles];
 
     if (filterType !== 'all') {
-      filtered = filtered.filter((v) => v.vehicle_type === filterType);
+      filtered = filtered.filter((v) => v.type === filterType);
     }
 
     if (filterStatus !== 'all') {
@@ -98,7 +53,7 @@ const VehicleTracking = () => {
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    await fetchVehicles();
+    await refetch();
     setTimeout(() => setRefreshing(false), 1000);
   };
 
@@ -215,7 +170,7 @@ const VehicleTracking = () => {
 
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
                     {filteredVehicles.map((vehicle) => {
-                      const Icon = getVehicleIcon(vehicle.vehicle_type);
+                      const Icon = getVehicleIcon(vehicle.type);
                       return (
                         <Sheet key={vehicle.id}>
                           <SheetTrigger asChild>
@@ -230,7 +185,7 @@ const VehicleTracking = () => {
                                   </div>
                                   <div className={cn('absolute -top-1 -right-1 w-3 h-3 rounded-full border-2 border-white', getStatusColor(vehicle.status))} />
                                 </div>
-                                <span className="text-xs font-medium text-center">{vehicle.vehicle_number}</span>
+                                <span className="text-xs font-medium text-center">{vehicle.plate_number}</span>
                                 <StatusBadge status={vehicle.status} />
                               </div>
                             </button>
@@ -239,7 +194,7 @@ const VehicleTracking = () => {
                             <SheetHeader>
                               <SheetTitle className="flex items-center gap-2">
                                 <Icon className="w-5 h-5" />
-                                {vehicle.vehicle_number}
+                                {vehicle.plate_number}
                               </SheetTitle>
                               <SheetDescription>Vehicle Details</SheetDescription>
                             </SheetHeader>
@@ -247,7 +202,7 @@ const VehicleTracking = () => {
                               <div className="grid grid-cols-2 gap-4">
                                 <div>
                                   <p className="text-sm text-muted-foreground">Type</p>
-                                  <p className="font-medium">{vehicle.vehicle_type}</p>
+                                  <p className="font-medium">{vehicle.type}</p>
                                 </div>
                                 <div>
                                   <p className="text-sm text-muted-foreground">Status</p>
@@ -299,7 +254,7 @@ const VehicleTracking = () => {
         ) : (
           <div className="space-y-4">
             {filteredVehicles.map((vehicle) => {
-              const Icon = getVehicleIcon(vehicle.vehicle_type);
+              const Icon = getVehicleIcon(vehicle.type);
               return (
                 <Card key={vehicle.id} className="shadow-card">
                   <CardContent className="p-6">
@@ -309,8 +264,8 @@ const VehicleTracking = () => {
                           <Icon className="w-6 h-6 text-white" />
                         </div>
                         <div>
-                          <h3 className="font-bold">{vehicle.vehicle_number}</h3>
-                          <p className="text-sm text-muted-foreground">{vehicle.vehicle_type}</p>
+                          <h3 className="font-bold">{vehicle.plate_number}</h3>
+                          <p className="text-sm text-muted-foreground">{vehicle.type}</p>
                           {vehicle.drivers && (
                             <p className="text-xs text-muted-foreground mt-1">
                               Driver: {vehicle.drivers.full_name}

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
+import { useDirectusAuth } from '@/contexts/DirectusAuthContext';
+import { useVehicles, useMissions, useDrivers } from '@/hooks/useDirectusData';
 import { StatCard } from '@/components/StatCard';
 import { Button } from '@/components/ui/button';
 import { Truck, AlertCircle, Users, Activity, MapPin, LogOut, Navigation, Wrench } from 'lucide-react';
@@ -16,8 +16,12 @@ interface DashboardStats {
 }
 
 const Dashboard = () => {
-  const { user, loading: authLoading, signOut } = useAuth();
+  const { user, loading: authLoading, signOut } = useDirectusAuth();
   const navigate = useNavigate();
+  const { data: vehicles, isLoading: vehiclesLoading } = useVehicles();
+  const { data: missions, isLoading: missionsLoading } = useMissions();
+  const { data: drivers, isLoading: driversLoading } = useDrivers();
+  
   const [stats, setStats] = useState<DashboardStats>({
     totalVehicles: 0,
     availableVehicles: 0,
@@ -29,7 +33,8 @@ const Dashboard = () => {
     atHQ: 0,
     maintenance: 0,
   });
-  const [loading, setLoading] = useState(true);
+  
+  const loading = vehiclesLoading || missionsLoading || driversLoading;
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -38,40 +43,30 @@ const Dashboard = () => {
   }, [user, authLoading, navigate]);
 
   useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        const [vehiclesRes, incidentsRes, respondersRes] = await Promise.all([
-          supabase.from('vehicles').select('*', { count: 'exact' }),
-          supabase.from('incidents').select('*', { count: 'exact' }).neq('status', 'resolved'),
-          supabase.from('responder_locations').select('*', { count: 'exact' }).eq('is_active', true),
-        ]);
+    if (vehicles && missions && drivers) {
+      const availableVehicles = vehicles.filter(v => v.status === 'Idle').length;
+      const ongoingMissions = missions.filter(m => m.status === 'In Progress').length;
+      const activeDrivers = drivers.length;
+      
+      // Calculate vehicle locations based on status
+      const deployed = vehicles.filter(v => v.status === 'Deployed').length;
+      const atHQ = vehicles.filter(v => v.status === 'HQ' || v.status === 'Idle').length;
+      const maintenance = vehicles.filter(v => v.status === 'Maintenance').length;
 
-        const availableVehicles = vehiclesRes.data?.filter(v => v.status === 'available').length || 0;
-        
-        // Calculate vehicle locations
-        const onRoad = vehiclesRes.data?.filter(v => v.location_status === 'on_road').length || 0;
-        const atHQ = vehiclesRes.data?.filter(v => v.location_status === 'hq').length || 0;
-        const maintenance = vehiclesRes.data?.filter(v => v.location_status === 'maintenance').length || 0;
+      setStats({
+        totalVehicles: vehicles.length,
+        availableVehicles,
+        ongoingIncidents: ongoingMissions,
+        activeResponders: activeDrivers,
+      });
 
-        setStats({
-          totalVehicles: vehiclesRes.count || 0,
-          availableVehicles,
-          ongoingIncidents: incidentsRes.count || 0,
-          activeResponders: respondersRes.count || 0,
-        });
-
-        setVehicleLocations({ onRoad, atHQ, maintenance });
-      } catch (error) {
-        console.error('Error fetching stats:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    if (user) {
-      fetchStats();
+      setVehicleLocations({ 
+        onRoad: deployed, 
+        atHQ, 
+        maintenance 
+      });
     }
-  }, [user]);
+  }, [vehicles, missions, drivers]);
 
   if (authLoading || loading) {
     return (
@@ -86,15 +81,17 @@ const Dashboard = () => {
       <header className="bg-white shadow-sm border-b sticky top-0 z-10">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 rounded-full bg-gradient-primary flex items-center justify-center">
-              <MapPin className="w-5 h-5 text-white" />
-            </div>
+            <img 
+              src="/drrmo.png" 
+              alt="DRRMO Logo" 
+              className="w-10 h-10 object-contain"
+            />
             <div>
-              <h1 className="text-xl font-bold text-foreground">DRRMO Tayabas</h1>
-              <p className="text-xs text-muted-foreground">Emergency Response Center</p>
+              <h1 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-green-600 bg-clip-text text-transparent">TRUCK DRIVE</h1>
+              <p className="text-xs text-muted-foreground">Vehicle Tracking System</p>
             </div>
           </div>
-          <Button variant="outline" onClick={signOut} size="sm">
+          <Button variant="outline" onClick={signOut} size="sm" className="border-blue-600 text-blue-600 hover:bg-blue-50">
             <LogOut className="w-4 h-4 mr-2" />
             Sign Out
           </Button>

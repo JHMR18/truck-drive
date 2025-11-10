@@ -1,225 +1,113 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
+import { useDirectusAuth } from '@/contexts/DirectusAuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { Shield, Loader2 } from 'lucide-react';
+import { Shield, Loader2, Truck } from 'lucide-react';
 
 const Auth = () => {
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [fullName, setFullName] = useState('');
-  const [contactNumber, setContactNumber] = useState('');
-  const [barangay, setBarangay] = useState('');
-  const [role, setRole] = useState<'barangay_responder' | 'drrmo_staff'>('barangay_responder');
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { signIn, user, role } = useDirectusAuth();
+
+  useEffect(() => {
+    // Redirect based on role
+    if (user && role) {
+      if (role === 'Driver') {
+        navigate('/driver/dashboard');
+      } else {
+        navigate('/dashboard');
+      }
+    }
+  }, [user, role, navigate]);
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-
-    if (error) {
+    try {
+      await signIn(email, password);
+    } catch (error: any) {
       toast({
         title: 'Error',
-        description: error.message,
+        description: error.message || 'Invalid email or password',
         variant: 'destructive',
       });
-    } else if (data.user) {
-      navigate('/dashboard');
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
-  };
-
-  const handleSignUp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          full_name: fullName,
-          contact_number: contactNumber,
-          barangay,
-          role,
-        },
-        emailRedirectTo: `${window.location.origin}/dashboard`,
-      },
-    });
-
-    if (error) {
-      toast({
-        title: 'Error',
-        description: error.message,
-        variant: 'destructive',
-      });
-    } else if (data.user) {
-      toast({
-        title: 'Success',
-        description: 'Account created successfully! You can now sign in.',
-      });
-      setEmail('');
-      setPassword('');
-      setFullName('');
-      setContactNumber('');
-      setBarangay('');
-    }
-
-    setLoading(false);
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-secondary/5 p-4">
-      <Card className="w-full max-w-md shadow-hover">
-        <CardHeader className="text-center space-y-2">
-          <div className="flex justify-center mb-4">
-            <div className="w-16 h-16 rounded-full bg-gradient-primary flex items-center justify-center">
-              <Shield className="w-8 h-8 text-white" />
-            </div>
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-green-50 to-yellow-50 p-4">
+      <Card className="w-full max-w-md shadow-2xl border-t-4 border-t-blue-600">
+        <CardHeader className="text-center space-y-4">
+          <div className="flex justify-center mb-2">
+            <img 
+              src="/drrmo.png" 
+              alt="DRRMO Logo" 
+              className="w-24 h-24 object-contain"
+            />
           </div>
-          <CardTitle className="text-2xl font-bold">DRRMO Tayabas City</CardTitle>
-          <CardDescription>
-            Emergency Response & Vehicle Tracking System
-          </CardDescription>
+          <div>
+            <CardTitle className="text-3xl font-bold bg-gradient-to-r from-blue-600 via-green-600 to-yellow-600 bg-clip-text text-transparent">
+              TRUCK DRIVE
+            </CardTitle>
+            <CardDescription className="text-base mt-2 font-medium text-gray-600">
+              Vehicle Tracking System
+            </CardDescription>
+            <CardDescription className="text-sm text-gray-500">
+              Emergency Response & Disaster Management
+            </CardDescription>
+          </div>
         </CardHeader>
         <CardContent>
-          <Tabs defaultValue="signin" className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="signin">Sign In</TabsTrigger>
-              <TabsTrigger value="signup">Sign Up</TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="signin">
-              <form onSubmit={handleSignIn} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="signin-email">Email</Label>
-                  <Input
-                    id="signin-email"
-                    type="email"
-                    placeholder="responder@drrmo.gov.ph"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="signin-password">Password</Label>
-                  <Input
-                    id="signin-password"
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                  />
-                </div>
-                <Button type="submit" className="w-full" disabled={loading}>
-                  {loading ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Signing in...
-                    </>
-                  ) : (
-                    'Sign In'
-                  )}
-                </Button>
-              </form>
-            </TabsContent>
-
-            <TabsContent value="signup">
-              <form onSubmit={handleSignUp} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="signup-name">Full Name</Label>
-                  <Input
-                    id="signup-name"
-                    type="text"
-                    placeholder="Juan Dela Cruz"
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="signup-email">Email</Label>
-                  <Input
-                    id="signup-email"
-                    type="email"
-                    placeholder="responder@drrmo.gov.ph"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="signup-contact">Contact Number</Label>
-                  <Input
-                    id="signup-contact"
-                    type="tel"
-                    placeholder="+63 912 345 6789"
-                    value={contactNumber}
-                    onChange={(e) => setContactNumber(e.target.value)}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="signup-barangay">Barangay</Label>
-                  <Input
-                    id="signup-barangay"
-                    type="text"
-                    placeholder="Barangay Name"
-                    value={barangay}
-                    onChange={(e) => setBarangay(e.target.value)}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="signup-role">Role</Label>
-                  <Select value={role} onValueChange={(value: any) => setRole(value)}>
-                    <SelectTrigger id="signup-role">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="barangay_responder">Barangay Responder</SelectItem>
-                      <SelectItem value="drrmo_staff">DRRMO Staff</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="signup-password">Password</Label>
-                  <Input
-                    id="signup-password"
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                  />
-                </div>
-                <Button type="submit" className="w-full" disabled={loading}>
-                  {loading ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Creating account...
-                    </>
-                  ) : (
-                    'Create Account'
-                  )}
-                </Button>
-              </form>
-            </TabsContent>
-          </Tabs>
+          <form onSubmit={handleSignIn} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="Enter your email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                className="border-blue-200 focus:border-blue-500"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="password">Password</Label>
+              <Input
+                id="password"
+                type="password"
+                placeholder="Enter your password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                className="border-blue-200 focus:border-blue-500"
+              />
+            </div>
+            <Button 
+              type="submit" 
+              className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800" 
+              disabled={loading}
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Signing in...
+                </>
+              ) : (
+                'Sign In'
+              )}
+            </Button>
+          </form>
         </CardContent>
       </Card>
     </div>

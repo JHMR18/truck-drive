@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
+import { useDirectusAuth } from '@/contexts/DirectusAuthContext';
+import { useVehicles, useCreateVehicle, useUpdateVehicle, useDeleteVehicle, useDrivers } from '@/hooks/useDirectusData';
 import { BottomNav } from '@/components/BottomNav';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,35 +13,22 @@ import { StatusBadge } from '@/components/StatusBadge';
 import { Plus, Edit, Trash2, Truck, MapPin, Activity } from 'lucide-react';
 import { toast } from 'sonner';
 
-interface Driver {
-  id: string;
-  full_name: string;
-}
-
-interface Vehicle {
-  id: string;
-  vehicle_number: string;
-  vehicle_type: string;
-  status: string;
-  location_status: string;
-  assigned_driver_id: string | null;
-  drivers?: Driver;
-}
-
 const Vehicles = () => {
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading } = useDirectusAuth();
   const navigate = useNavigate();
-  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
-  const [drivers, setDrivers] = useState<Driver[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: vehicles, isLoading: vehiclesLoading } = useVehicles();
+  const { data: drivers, isLoading: driversLoading } = useDrivers();
+  const createVehicle = useCreateVehicle();
+  const updateVehicle = useUpdateVehicle();
+  const deleteVehicle = useDeleteVehicle();
+  
+  const loading = vehiclesLoading || driversLoading;
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null);
+  const [editingVehicle, setEditingVehicle] = useState<any>(null);
   const [formData, setFormData] = useState({
-    vehicle_number: '',
-    vehicle_type: 'ambulance',
-    status: 'available',
-    location_status: 'hq',
-    assigned_driver_id: '',
+    plate_number: '',
+    type: 'Ambulance',
+    status: 'Idle',
   });
 
   useEffect(() => {
@@ -50,72 +37,28 @@ const Vehicles = () => {
     }
   }, [user, authLoading, navigate]);
 
-  useEffect(() => {
-    if (user) {
-      fetchVehicles();
-      fetchDrivers();
-    }
-  }, [user]);
 
-  const fetchVehicles = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('vehicles')
-        .select('*, drivers(id, full_name)')
-        .order('created_at', { ascending: false });
-      
-      if (error) throw error;
-      setVehicles(data || []);
-    } catch (error) {
-      console.error('Error fetching vehicles:', error);
-      toast.error('Failed to load vehicles');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchDrivers = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('drivers')
-        .select('id, full_name')
-        .eq('status', 'active');
-      
-      if (error) throw error;
-      setDrivers(data || []);
-    } catch (error) {
-      console.error('Error fetching drivers:', error);
-    }
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const vehicleData = {
+      const vehicleData: any = {
         ...formData,
-        assigned_driver_id: formData.assigned_driver_id || null,
       };
 
       if (editingVehicle) {
-        const { error } = await supabase
-          .from('vehicles')
-          .update(vehicleData)
-          .eq('id', editingVehicle.id);
-        
-        if (error) throw error;
+        await updateVehicle.mutateAsync({ 
+          id: editingVehicle.id, 
+          data: vehicleData 
+        });
         toast.success('Vehicle updated successfully');
       } else {
-        const { error } = await supabase
-          .from('vehicles')
-          .insert([vehicleData]);
-        
-        if (error) throw error;
+        await createVehicle.mutateAsync(vehicleData);
         toast.success('Vehicle added successfully');
       }
 
       setDialogOpen(false);
       resetForm();
-      fetchVehicles();
     } catch (error) {
       console.error('Error saving vehicle:', error);
       toast.error('Failed to save vehicle');
@@ -126,29 +69,21 @@ const Vehicles = () => {
     if (!confirm('Are you sure you want to delete this vehicle?')) return;
     
     try {
-      const { error } = await supabase
-        .from('vehicles')
-        .delete()
-        .eq('id', id);
-      
-      if (error) throw error;
+      await deleteVehicle.mutateAsync(id);
       toast.success('Vehicle deleted successfully');
-      fetchVehicles();
     } catch (error) {
       console.error('Error deleting vehicle:', error);
       toast.error('Failed to delete vehicle');
     }
   };
 
-  const openDialog = (vehicle?: Vehicle) => {
+  const openDialog = (vehicle?: any) => {
     if (vehicle) {
       setEditingVehicle(vehicle);
       setFormData({
-        vehicle_number: vehicle.vehicle_number,
-        vehicle_type: vehicle.vehicle_type,
+        plate_number: vehicle.plate_number,
+        type: vehicle.type,
         status: vehicle.status,
-        location_status: vehicle.location_status || 'hq',
-        assigned_driver_id: vehicle.assigned_driver_id || '',
       });
     } else {
       resetForm();
@@ -159,11 +94,9 @@ const Vehicles = () => {
   const resetForm = () => {
     setEditingVehicle(null);
     setFormData({
-      vehicle_number: '',
-      vehicle_type: 'ambulance',
-      status: 'available',
-      location_status: 'hq',
-      assigned_driver_id: '',
+      plate_number: '',
+      type: 'Ambulance',
+      status: 'Idle',
     });
   };
 
@@ -202,28 +135,30 @@ const Vehicles = () => {
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <div>
-                    <Label htmlFor="vehicle_number">Plate Number</Label>
+                    <Label htmlFor="plate_number">Plate Number</Label>
                     <Input
-                      id="vehicle_number"
-                      value={formData.vehicle_number}
-                      onChange={(e) => setFormData({ ...formData, vehicle_number: e.target.value })}
+                      id="plate_number"
+                      value={formData.plate_number}
+                      onChange={(e) => setFormData({ ...formData, plate_number: e.target.value })}
                       required
                     />
                   </div>
                   <div>
-                    <Label htmlFor="vehicle_type">Type</Label>
+                    <Label htmlFor="type">Type</Label>
                     <Select
-                      value={formData.vehicle_type}
-                      onValueChange={(value) => setFormData({ ...formData, vehicle_type: value })}
+                      value={formData.type}
+                      onValueChange={(value) => setFormData({ ...formData, type: value })}
                     >
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="ambulance">Ambulance</SelectItem>
-                        <SelectItem value="firetruck">Firetruck</SelectItem>
-                        <SelectItem value="patrol">Patrol Vehicle</SelectItem>
-                        <SelectItem value="rescue">Rescue Vehicle</SelectItem>
+                        <SelectItem value="Ambulance">Ambulance</SelectItem>
+                        <SelectItem value="Fire Truck">Fire Truck</SelectItem>
+                        <SelectItem value="Supply Truck">Supply Truck</SelectItem>
+                        <SelectItem value="Rescue Vehicle">Rescue Vehicle</SelectItem>
+                        <SelectItem value="Command Vehicle">Command Vehicle</SelectItem>
+                        <SelectItem value="Other">Other</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -237,44 +172,10 @@ const Vehicles = () => {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="available">Available</SelectItem>
-                        <SelectItem value="in_use">On Duty</SelectItem>
-                        <SelectItem value="maintenance">Broken/Maintenance</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label htmlFor="location_status">Location</Label>
-                    <Select
-                      value={formData.location_status}
-                      onValueChange={(value) => setFormData({ ...formData, location_status: value })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="hq">At HQ</SelectItem>
-                        <SelectItem value="on_road">On Road</SelectItem>
-                        <SelectItem value="maintenance">Maintenance</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label htmlFor="assigned_driver">Assigned Driver</Label>
-                    <Select
-                      value={formData.assigned_driver_id}
-                      onValueChange={(value) => setFormData({ ...formData, assigned_driver_id: value })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select driver (optional)" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="">None</SelectItem>
-                        {drivers.map((driver) => (
-                          <SelectItem key={driver.id} value={driver.id}>
-                            {driver.full_name}
-                          </SelectItem>
-                        ))}
+                        <SelectItem value="Idle">Idle</SelectItem>
+                        <SelectItem value="Deployed">Deployed</SelectItem>
+                        <SelectItem value="HQ">HQ</SelectItem>
+                        <SelectItem value="Maintenance">Maintenance</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -295,26 +196,17 @@ const Vehicles = () => {
               <TableRow>
                 <TableHead>Plate Number</TableHead>
                 <TableHead>Type</TableHead>
-                <TableHead>Driver</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead>Location</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {vehicles.map((vehicle) => (
+              {vehicles?.map((vehicle: any) => (
                 <TableRow key={vehicle.id}>
-                  <TableCell className="font-medium">{vehicle.vehicle_number}</TableCell>
-                  <TableCell className="capitalize">{vehicle.vehicle_type}</TableCell>
-                  <TableCell>{vehicle.drivers?.full_name || 'Unassigned'}</TableCell>
+                  <TableCell className="font-medium">{vehicle.plate_number}</TableCell>
+                  <TableCell className="capitalize">{vehicle.type}</TableCell>
                   <TableCell>
                     <StatusBadge status={vehicle.status} />
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-1">
-                      <MapPin className="w-3 h-3" />
-                      <span className="text-sm capitalize">{vehicle.location_status || 'hq'}</span>
-                    </div>
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">
