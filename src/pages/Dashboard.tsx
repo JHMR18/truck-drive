@@ -87,7 +87,7 @@ const Dashboard = () => {
               className="w-10 h-10 object-contain"
             />
             <div>
-              <h1 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-green-600 bg-clip-text text-transparent">TRUCK DRIVE</h1>
+              <h1 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-green-600 bg-clip-text text-transparent">TRACK DRIVE</h1>
               <p className="text-xs text-muted-foreground">Vehicle Tracking System</p>
             </div>
           </div>

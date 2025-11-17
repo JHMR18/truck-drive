@@ -177,6 +177,21 @@ export const useUpdateDriverProfile = () => {
 };
 
 // Location tracking
+export const useLocationLogs = () => {
+  return useQuery({
+    queryKey: ['location_logs'],
+    queryFn: async () => {
+      return await directus.request(
+        readItems('location_logs', {
+          fields: ['*', 'vehicle_id.*', 'driver_id.*'],
+          sort: ['-timestamp'],
+        })
+      );
+    },
+    refetchInterval: 10000, // Refetch every 10 seconds
+  });
+};
+
 export const useCreateLocationLog = () => {
   return useMutation({
     mutationFn: async (location: {
@@ -193,6 +208,18 @@ export const useCreateLocationLog = () => {
           timestamp: new Date().toISOString(),
         })
       );
+    },
+  });
+};
+
+export const useUpdateLocationLog = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: any }) => {
+      return await directus.request(updateItem('location_logs', id, data));
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['location_logs'] });
     },
   });
 };

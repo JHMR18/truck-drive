@@ -190,47 +190,90 @@ const Vehicles = () => {
       </header>
 
       <main className="container mx-auto px-4 py-6">
-        <div className="bg-white rounded-lg shadow-card overflow-hidden">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Plate Number</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
+        {vehicles && vehicles.length === 0 ? (
+          <div className="bg-white rounded-lg shadow-card p-8 text-center text-muted-foreground">
+            No vehicles found. Click "Add Vehicle" to create your first vehicle.
+          </div>
+        ) : (
+          <>
+            {/* Desktop Table View - Hidden on Mobile */}
+            <div className="hidden md:block bg-white rounded-lg shadow-card overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Plate Number</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {vehicles?.map((vehicle: any) => (
+                    <TableRow key={vehicle.id}>
+                      <TableCell className="font-medium">{vehicle.plate_number}</TableCell>
+                      <TableCell className="capitalize">{vehicle.type}</TableCell>
+                      <TableCell>
+                        <StatusBadge status={vehicle.status} />
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => openDialog(vehicle)}
+                          >
+                            <Edit className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleDelete(vehicle.id)}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+
+            {/* Mobile Card View - Hidden on Desktop */}
+            <div className="md:hidden space-y-4">
               {vehicles?.map((vehicle: any) => (
-                <TableRow key={vehicle.id}>
-                  <TableCell className="font-medium">{vehicle.plate_number}</TableCell>
-                  <TableCell className="capitalize">{vehicle.type}</TableCell>
-                  <TableCell>
-                    <StatusBadge status={vehicle.status} />
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => openDialog(vehicle)}
-                      >
-                        <Edit className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleDelete(vehicle.id)}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
+                <div key={vehicle.id} className="bg-white rounded-lg shadow-card p-4 space-y-3">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-lg">{vehicle.plate_number}</h3>
+                      <p className="text-sm text-muted-foreground capitalize">{vehicle.type}</p>
                     </div>
-                  </TableCell>
-                </TableRow>
+                    <StatusBadge status={vehicle.status} />
+                  </div>
+                  
+                  <div className="flex gap-2 pt-2 border-t">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="flex-1"
+                      onClick={() => openDialog(vehicle)}
+                    >
+                      <Edit className="w-4 h-4 mr-2" />
+                      Edit
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleDelete(vehicle.id)}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
               ))}
-            </TableBody>
-          </Table>
-        </div>
+            </div>
+          </>
+        )}
       </main>
 
       <BottomNav />

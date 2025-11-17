@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useDirectusAuth } from '@/contexts/DirectusAuthContext';
-import { useDrivers, useDriverProfiles, useVehicles, useCreateDriverProfile, useUpdateDriverProfile } from '@/hooks/useDirectusData';
+import { useDrivers, useDriverProfiles, useVehicles, useCreateDriverProfile, useUpdateDriverProfile, useUpdateVehicle } from '@/hooks/useDirectusData';
 import { BottomNav } from '@/components/BottomNav';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -18,15 +18,17 @@ const Drivers = () => {
   const navigate = useNavigate();
   const { data: drivers, isLoading: driversLoading, refetch: refetchDrivers } = useDrivers();
   const { data: driverProfiles, isLoading: profilesLoading, refetch: refetchProfiles } = useDriverProfiles();
-  const { data: vehicles, isLoading: vehiclesLoading } = useVehicles();
+  const { data: vehicles, isLoading: vehiclesLoading, refetch: refetchVehicles } = useVehicles();
   const createDriverProfile = useCreateDriverProfile();
   const updateDriverProfile = useUpdateDriverProfile();
+  const updateVehicle = useUpdateVehicle();
   
   const loading = driversLoading || profilesLoading || vehiclesLoading;
   const [dialogOpen, setDialogOpen] = useState(false);
   const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [editingDriver, setEditingDriver] = useState<any>(null);
+  const [editingProfileId, setEditingProfileId] = useState<string | null>(null);
   const [selectedDriverForAction, setSelectedDriverForAction] = useState<any>(null);
   const [newPassword, setNewPassword] = useState('');
   const [formData, setFormData] = useState({
@@ -65,25 +67,58 @@ const Drivers = () => {
 
         if (!response.ok) throw new Error('Failed to update user');
 
-        // Update driver profile
-        const profile = driverProfiles?.find((p: any) => p.user_id === editingDriver.id);
-        if (profile) {
+        // Update driver profile - use the stored profile ID
+        if (editingProfileId) {
+          // Get old vehicle ID for status update
+          const profile = driverProfiles?.find((p: any) => p.id === editingProfileId);
+          const oldVehicleId = profile?.assigned_vehicle_id ? 
+            (typeof profile.assigned_vehicle_id === 'object' ? profile.assigned_vehicle_id.id : profile.assigned_vehicle_id) : 
+            null;
+          const newVehicleId = formData.assigned_vehicle_id || null;
+
           await updateDriverProfile.mutateAsync({
-            id: profile.id,
+            id: editingProfileId,
             data: {
               license_number: formData.license_number,
-              assigned_vehicle_id: formData.assigned_vehicle_id || null,
+              assigned_vehicle_id: newVehicleId,
               availability_status: formData.availability_status,
             },
           });
+
+          // Update vehicle status - Set old vehicle to Idle if unassigning, new vehicle to Deployed if assigning
+          if (oldVehicleId && oldVehicleId !== newVehicleId) {
+            // Unassigning from old vehicle - set it to Idle
+            await updateVehicle.mutateAsync({
+              id: oldVehicleId,
+              data: { status: 'Idle' },
+            });
+          }
+
+          if (newVehicleId && oldVehicleId !== newVehicleId) {
+            // Assigning to new vehicle - set it to Deployed
+            await updateVehicle.mutateAsync({
+              id: newVehicleId,
+              data: { status: 'Deployed' },
+            });
+          }
         } else {
-          // Create profile if doesn't exist
+          // Create profile if doesn't exist (shouldn't happen in normal flow)
+          const newVehicleId = formData.assigned_vehicle_id || null;
+          
           await createDriverProfile.mutateAsync({
             user_id: editingDriver.id,
             license_number: formData.license_number,
-            assigned_vehicle_id: formData.assigned_vehicle_id || null,
+            assigned_vehicle_id: newVehicleId,
             availability_status: formData.availability_status,
           });
+
+          // If assigning a vehicle, update its status to Deployed
+          if (newVehicleId) {
+            await updateVehicle.mutateAsync({
+              id: newVehicleId,
+              data: { status: 'Deployed' },
+            });
+          }
         }
 
         toast.success('Driver updated successfully');
@@ -135,6 +170,14 @@ const Drivers = () => {
           availability_status: formData.availability_status,
         });
 
+        // If assigning a vehicle, update its status to Deployed
+        if (formData.assigned_vehicle_id) {
+          await updateVehicle.mutateAsync({
+            id: formData.assigned_vehicle_id,
+            data: { status: 'Deployed' },
+          });
+        }
+
         toast.success('Driver added successfully');
       }
 
@@ -144,6 +187,7 @@ const Drivers = () => {
       // Refresh data instead of reloading page
       await refetchDrivers();
       await refetchProfiles();
+      await refetchVehicles();
     } catch (error: any) {
       console.error('Error saving driver:', error);
       toast.error(error.message || 'Failed to save driver');
@@ -219,11 +263,14 @@ const Drivers = () => {
     if (driver) {
       setEditingDriver(driver);
       
-      // Find profile - user_id might be an object
+      // Find profile by matching user_id to driver.id
       const profile = driverProfiles?.find((p: any) => {
         const userId = typeof p.user_id === 'object' ? p.user_id.id : p.user_id;
         return userId === driver.id;
       });
+      
+      // Store the profile ID for updating
+      setEditingProfileId(profile?.id || null);
       
       // Handle assigned_vehicle_id - it might be an object with id property or just an ID
       let vehicleId = '';
@@ -250,6 +297,7 @@ const Drivers = () => {
 
   const resetForm = () => {
     setEditingDriver(null);
+    setEditingProfileId(null);
     setFormData({
       first_name: '',
       last_name: '',
@@ -356,9 +404,21 @@ const Drivers = () => {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="none">None</SelectItem>
-                        {vehicles?.map((vehicle: any) => (
+                        {vehicles?.filter((vehicle: any) => {
+                          // Show vehicles that are either:
+                          // 1. Currently assigned to this driver (if editing)
+                          // 2. Not deployed (available for assignment)
+                          const currentlyAssignedToThisDriver = editingDriver && 
+                            driverProfiles?.some((p: any) => {
+                              const userId = typeof p.user_id === 'object' ? p.user_id.id : p.user_id;
+                              const vehicleId = typeof p.assigned_vehicle_id === 'object' ? p.assigned_vehicle_id?.id : p.assigned_vehicle_id;
+                              return userId === editingDriver.id && vehicleId === vehicle.id;
+                            });
+                          
+                          return currentlyAssignedToThisDriver || vehicle.status !== 'Deployed';
+                        }).map((vehicle: any) => (
                           <SelectItem key={vehicle.id} value={String(vehicle.id)}>
-                            {vehicle.plate_number} ({vehicle.type})
+                            {vehicle.plate_number} ({vehicle.type}) - {vehicle.status}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -391,94 +451,165 @@ const Drivers = () => {
       </header>
 
       <main className="container mx-auto px-4 py-6">
-        <div className="bg-white rounded-lg shadow-card overflow-hidden">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Full Name</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>License</TableHead>
-                <TableHead>Assigned Vehicle</TableHead>
-                <TableHead>Availability</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {drivers && drivers.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                    No drivers found. Click "Add Driver" to create your first driver account.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                drivers?.map((driver: any) => {
-                  // Find driver profile to get assigned vehicle
-                  // user_id might be an object or just an ID
-                  const profile = driverProfiles?.find((p: any) => {
-                    const userId = typeof p.user_id === 'object' ? p.user_id.id : p.user_id;
-                    return userId === driver.id;
-                  });
-                  
-                  // Handle assigned_vehicle_id - it might be an object or an ID
-                  let assignedVehicle = null;
-                  if (profile?.assigned_vehicle_id) {
-                    if (typeof profile.assigned_vehicle_id === 'object') {
-                      // If it's already expanded, use it directly
-                      assignedVehicle = profile.assigned_vehicle_id;
-                    } else {
-                      // If it's just an ID, find the vehicle
-                      assignedVehicle = vehicles?.find((v: any) => v.id === profile.assigned_vehicle_id);
+        {drivers && drivers.length === 0 ? (
+          <div className="bg-white rounded-lg shadow-card p-8 text-center text-muted-foreground">
+            No drivers found. Click "Add Driver" to create your first driver account.
+          </div>
+        ) : (
+          <>
+            {/* Desktop Table View - Hidden on Mobile */}
+            <div className="hidden md:block bg-white rounded-lg shadow-card overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Full Name</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>License</TableHead>
+                    <TableHead>Assigned Vehicle</TableHead>
+                    <TableHead>Availability</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {drivers?.map((driver: any) => {
+                    const profile = driverProfiles?.find((p: any) => {
+                      const userId = typeof p.user_id === 'object' ? p.user_id.id : p.user_id;
+                      return userId === driver.id;
+                    });
+                    
+                    let assignedVehicle = null;
+                    if (profile?.assigned_vehicle_id) {
+                      if (typeof profile.assigned_vehicle_id === 'object') {
+                        assignedVehicle = profile.assigned_vehicle_id;
+                      } else {
+                        assignedVehicle = vehicles?.find((v: any) => v.id === profile.assigned_vehicle_id);
+                      }
                     }
+                    
+                    return (
+                      <TableRow key={driver.id}>
+                        <TableCell className="font-medium">{driver.first_name} {driver.last_name}</TableCell>
+                        <TableCell>{driver.email || 'N/A'}</TableCell>
+                        <TableCell>{profile?.license_number || 'N/A'}</TableCell>
+                        <TableCell>
+                          {assignedVehicle ? assignedVehicle.plate_number : 'Unassigned'}
+                        </TableCell>
+                        <TableCell>
+                          <StatusBadge status={profile?.availability_status || 'Off Duty'} />
+                        </TableCell>
+                        <TableCell>
+                          <StatusBadge status={driver.status} />
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => openDialog(driver)}
+                            >
+                              <Edit className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handlePasswordReset(driver)}
+                              title="Reset Password"
+                            >
+                              🔑
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleDelete(driver)}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+
+            {/* Mobile Card View - Hidden on Desktop */}
+            <div className="md:hidden space-y-4">
+              {drivers?.map((driver: any) => {
+                const profile = driverProfiles?.find((p: any) => {
+                  const userId = typeof p.user_id === 'object' ? p.user_id.id : p.user_id;
+                  return userId === driver.id;
+                });
+                
+                let assignedVehicle = null;
+                if (profile?.assigned_vehicle_id) {
+                  if (typeof profile.assigned_vehicle_id === 'object') {
+                    assignedVehicle = profile.assigned_vehicle_id;
+                  } else {
+                    assignedVehicle = vehicles?.find((v: any) => v.id === profile.assigned_vehicle_id);
                   }
-                  
-                  return (
-                    <TableRow key={driver.id}>
-                      <TableCell className="font-medium">{driver.first_name} {driver.last_name}</TableCell>
-                      <TableCell>{driver.email || 'N/A'}</TableCell>
-                      <TableCell>{profile?.license_number || 'N/A'}</TableCell>
-                      <TableCell>
-                        {assignedVehicle ? assignedVehicle.plate_number : 'Unassigned'}
-                      </TableCell>
-                      <TableCell>
-                        <StatusBadge status={profile?.availability_status || 'Off Duty'} />
-                      </TableCell>
-                      <TableCell>
-                        <StatusBadge status={driver.status} />
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => openDialog(driver)}
-                          >
-                            <Edit className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handlePasswordReset(driver)}
-                            title="Reset Password"
-                          >
-                            🔑
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleDelete(driver)}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
+                }
+                
+                return (
+                  <div key={driver.id} className="bg-white rounded-lg shadow-card p-4 space-y-3">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <h3 className="font-semibold text-lg">{driver.first_name} {driver.last_name}</h3>
+                        <p className="text-sm text-muted-foreground">{driver.email || 'N/A'}</p>
+                      </div>
+                      <StatusBadge status={driver.status} />
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-3 text-sm">
+                      <div>
+                        <span className="text-muted-foreground">License:</span>
+                        <p className="font-medium">{profile?.license_number || 'N/A'}</p>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Vehicle:</span>
+                        <p className="font-medium">{assignedVehicle ? assignedVehicle.plate_number : 'Unassigned'}</p>
+                      </div>
+                      <div className="col-span-2">
+                        <span className="text-muted-foreground">Availability:</span>
+                        <div className="mt-1">
+                          <StatusBadge status={profile?.availability_status || 'Off Duty'} />
                         </div>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })
-              )}
-            </TableBody>
-          </Table>
-        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="flex gap-2 pt-2 border-t">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex-1"
+                        onClick={() => openDialog(driver)}
+                      >
+                        <Edit className="w-4 h-4 mr-2" />
+                        Edit
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handlePasswordReset(driver)}
+                        title="Reset Password"
+                      >
+                        🔑
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleDelete(driver)}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        )}
       </main>
 
       {/* Password Reset Modal */}

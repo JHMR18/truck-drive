@@ -73,7 +73,11 @@ export default function DriverDashboard() {
     <div className="min-h-screen bg-gray-50 p-4">
       {driverProfile?.assigned_vehicle_id && (
         <LocationTracker
-          vehicleId={driverProfile.assigned_vehicle_id}
+          vehicleId={
+            typeof driverProfile.assigned_vehicle_id === 'object' 
+              ? driverProfile.assigned_vehicle_id.id 
+              : driverProfile.assigned_vehicle_id
+          }
           driverId={user?.id}
         />
       )}

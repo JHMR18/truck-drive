@@ -122,3 +122,28 @@ All colors MUST be HSL.
     @apply bg-background text-foreground;
   }
 }
+
+/* Leaflet map styles */
+.leaflet-container {
+  font-family: inherit;
+  z-index: 1;
+}
+
+.custom-vehicle-icon {
+  background: none !important;
+  border: none !important;
+}
+
+.leaflet-popup-content-wrapper {
+  border-radius: 0.5rem;
+  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+}
+
+.leaflet-popup-content {
+  margin: 0;
+  min-width: 200px;
+}
+
+.leaflet-popup-tip {
+  box-shadow: 0 3px 14px rgba(0,0,0,0.1);
+}

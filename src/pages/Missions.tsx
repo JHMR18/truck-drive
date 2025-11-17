@@ -142,26 +142,7 @@ export default function Missions() {
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="vehicle">Assign Vehicle</Label>
-                    <Select
-                      value={formData.assigned_vehicle_id}
-                      onValueChange={(value) =>
-                        setFormData({ ...formData, assigned_vehicle_id: value })
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select vehicle" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {availableVehicles?.map((vehicle: any) => (
-                          <SelectItem key={vehicle.id} value={vehicle.id}>
-                            {vehicle.plate_number} - {vehicle.type}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+
                   <div>
                     <Label htmlFor="driver">Assign Driver</Label>
                     <Select
