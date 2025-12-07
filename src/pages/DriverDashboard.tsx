@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Truck, MapPin, Clock, AlertCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { MissionMap } from '@/components/MissionMap';
 
 export default function DriverDashboard() {
   const { user } = useDirectusAuth();
@@ -121,8 +122,10 @@ export default function DriverDashboard() {
                   <CardHeader>
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
-                        <CardTitle className="text-xl">{mission.title}</CardTitle>
-                        <CardDescription className="mt-2">
+                        <div className="flex items-center gap-2 mb-2">
+                          <CardTitle className="text-xl">{mission.missions || 'Mission'}</CardTitle>
+                        </div>
+                        <CardDescription>
                           {mission.description}
                         </CardDescription>
                       </div>
@@ -132,6 +135,21 @@ export default function DriverDashboard() {
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-4">
+                    {mission.lat && mission.long && (
+                      <div>
+                        <div className="flex items-center gap-2 text-sm text-gray-600 mb-2">
+                          <MapPin className="h-4 w-4" />
+                          <span>Incident Location</span>
+                        </div>
+                        <MissionMap
+                          lat={parseFloat(mission.lat)}
+                          lng={parseFloat(mission.long)}
+                          missionTitle={mission.missions}
+                          height="350px"
+                        />
+                      </div>
+                    )}
+
                     <div className="flex items-center gap-4 text-sm text-gray-600">
                       <div className="flex items-center gap-1">
                         <Clock className="h-4 w-4" />

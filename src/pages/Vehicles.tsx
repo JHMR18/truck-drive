@@ -157,7 +157,7 @@ const Vehicles = () => {
                         <SelectItem value="Fire Truck">Fire Truck</SelectItem>
                         <SelectItem value="Supply Truck">Supply Truck</SelectItem>
                         <SelectItem value="Rescue Vehicle">Rescue Vehicle</SelectItem>
-                        <SelectItem value="Command Vehicle">Command Vehicle</SelectItem>
+                        <SelectItem value="Coaster Vehicle">Coaster Vehicle</SelectItem>
                         <SelectItem value="Other">Other</SelectItem>
                       </SelectContent>
                     </Select>

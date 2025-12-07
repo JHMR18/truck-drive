@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useDirectusAuth } from '@/contexts/DirectusAuthContext';
-import { useVehicles, useMissions, useDrivers } from '@/hooks/useDirectusData';
+import { useVehicles, useMissions, useDrivers, useMaintenanceLogs } from '@/hooks/useDirectusData';
 import { StatCard } from '@/components/StatCard';
 import { Button } from '@/components/ui/button';
 import { Truck, AlertCircle, Users, Activity, MapPin, LogOut, Navigation, Wrench } from 'lucide-react';
@@ -21,19 +21,26 @@ const Dashboard = () => {
   const { data: vehicles, isLoading: vehiclesLoading } = useVehicles();
   const { data: missions, isLoading: missionsLoading } = useMissions();
   const { data: drivers, isLoading: driversLoading } = useDrivers();
-  
+  const { data: maintenanceLogs } = useMaintenanceLogs();
+
   const [stats, setStats] = useState<DashboardStats>({
     totalVehicles: 0,
     availableVehicles: 0,
     ongoingIncidents: 0,
     activeResponders: 0,
   });
+
   const [vehicleLocations, setVehicleLocations] = useState({
     onRoad: 0,
     atHQ: 0,
     maintenance: 0,
   });
-  
+
+  const [recentActivity, setRecentActivity] = useState<any[]>([]);
+  const [systemAlerts, setSystemAlerts] = useState<any[]>([]);
+  const [monthlyIncidents, setMonthlyIncidents] = useState(0);
+  const [avgResponseTime, setAvgResponseTime] = useState(0);
+
   const loading = vehiclesLoading || missionsLoading || driversLoading;
 
   useEffect(() => {
@@ -44,27 +51,125 @@ const Dashboard = () => {
 
   useEffect(() => {
     if (vehicles && missions && drivers) {
-      const availableVehicles = vehicles.filter(v => v.status === 'Idle').length;
-      const ongoingMissions = missions.filter(m => m.status === 'In Progress').length;
-      const activeDrivers = drivers.length;
-      
-      // Calculate vehicle locations based on status
-      const deployed = vehicles.filter(v => v.status === 'Deployed').length;
-      const atHQ = vehicles.filter(v => v.status === 'HQ' || v.status === 'Idle').length;
-      const maintenance = vehicles.filter(v => v.status === 'Maintenance').length;
+      // 1. Basic Stats
+      const availableVehicles = vehicles.filter((v: any) => v.status === 'Idle').length;
+      const ongoingMissions = missions.filter((m: any) => m.status === 'In Progress').length;
+
+      // Calculate active drivers (drivers with missions today or currently active)
+      // For now, simpler approach: drivers assigned to ongoing missions
+      const activeDriverIds = new Set(missions
+        .filter((m: any) => m.status === 'In Progress' && m.assigned_driver_id)
+        .map((m: any) => m.assigned_driver_id.id)
+      );
+      const activeResponders = activeDriverIds.size;
+
+      const deployed = vehicles.filter((v: any) => v.status === 'Deployed').length;
+      const atHQ = vehicles.filter((v: any) => v.status === 'HQ' || v.status === 'Idle').length;
+      const maintenance = vehicles.filter((v: any) => v.status === 'Maintenance').length;
 
       setStats({
         totalVehicles: vehicles.length,
         availableVehicles,
         ongoingIncidents: ongoingMissions,
-        activeResponders: activeDrivers,
+        activeResponders,
       });
 
-      setVehicleLocations({ 
-        onRoad: deployed, 
-        atHQ, 
-        maintenance 
+      setVehicleLocations({
+        onRoad: deployed,
+        atHQ,
+        maintenance
       });
+
+      // 2. Recent Activity (from Missions)
+      // Sort missions by date_created desc
+      const sortedMissions = [...missions].sort((a: any, b: any) =>
+        new Date(b.date_created).getTime() - new Date(a.date_created).getTime()
+      ).slice(0, 5);
+
+      const activityFeed = sortedMissions.map((m: any) => {
+        let type = 'primary';
+        let action = `Mission: ${m.missions}`;
+
+        if (m.status === 'In Progress') {
+          type = 'dispatch';
+          action = `${m.assigned_vehicle_id?.plate_number || 'Vehicle'} dispatched`;
+        } else if (m.status === 'Completed') {
+          type = 'return';
+          action = `Mission completed: ${m.missions}`;
+        } else if (m.status === 'Planned') {
+          type = 'checkin';
+        } else if (m.status === 'Delayed') {
+          type = 'incident';
+          action = `Mission delayed: ${m.missions}`;
+        }
+
+        return {
+          action,
+          location: `Lat: ${Number(m.lat).toFixed(4)}, Long: ${Number(m.long).toFixed(4)}`, // Or reverse geocode if possible, using coords for now
+          time: new Date(m.date_created).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          timestamp: m.date_created,
+          type
+        };
+      });
+      setRecentActivity(activityFeed);
+
+      // 3. Alerts (Maintenance + Delayed Missions)
+      const alerts = [];
+
+      // Maintenance alerts
+      vehicles.forEach((v: any) => {
+        if (v.status === 'Maintenance') {
+          alerts.push({
+            message: `Vehicle ${v.plate_number} in maintenance`,
+            severity: 'warning',
+            time: 'Ongoing'
+          });
+        }
+      });
+
+      // Delayed missions
+      missions.forEach((m: any) => {
+        if (m.status === 'Delayed') {
+          alerts.push({
+            message: `Mission delayed: ${m.missions}`,
+            severity: 'urgent',
+            time: new Date(m.date_created).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          });
+        }
+      });
+
+      // Add some sample if empty to preserve UI look for logic check
+      if (alerts.length === 0) {
+        alerts.push({ message: 'System nominal', severity: 'info', time: 'Now' });
+      }
+
+      setSystemAlerts(alerts.slice(0, 5));
+
+      // 4. Quick Stats
+      // Incidents This Month
+      const now = new Date();
+      const thisMonthMissions = missions.filter((m: any) => {
+        const d = new Date(m.date_created);
+        return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+      }).length;
+      setMonthlyIncidents(thisMonthMissions);
+
+      // Avg Response Time (Completed missions)
+      // Assuming 'date_created' is incident report time and 'start_time' is dispatch time
+      // Or just duration if start and end exist. Let's use duration (End - Start)
+      const completedMissions = missions.filter((m: any) => m.status === 'Completed' && m.start_time && m.end_time);
+      if (completedMissions.length > 0) {
+        const totalDuration = completedMissions.reduce((acc: number, m: any) => {
+          const start = new Date(m.start_time).getTime();
+          const end = new Date(m.end_time).getTime();
+          return acc + (end - start);
+        }, 0);
+        // Convert ms to minutes
+        setAvgResponseTime(Math.round((totalDuration / completedMissions.length) / 60000));
+      } else {
+        setAvgResponseTime(0);
+      }
+
     }
   }, [vehicles, missions, drivers]);
 
@@ -81,9 +186,9 @@ const Dashboard = () => {
       <header className="bg-white shadow-sm border-b sticky top-0 z-10">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center space-x-3">
-            <img 
-              src="/drrmo.png" 
-              alt="DRRMO Logo" 
+            <img
+              src="/drrmo.png"
+              alt="DRRMO Logo"
               className="w-10 h-10 object-contain"
             />
             <div>
@@ -220,27 +325,24 @@ const Dashboard = () => {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {[
-                  { action: 'Ambulance #2 dispatched', location: 'Barangay San Diego', time: '3 mins ago', type: 'dispatch' },
-                  { action: 'Firetruck #1 returned to HQ', location: 'DRRMO Station', time: '12 mins ago', type: 'return' },
-                  { action: 'Driver Juan Cruz checked in', location: 'Vehicle #5', time: '25 mins ago', type: 'checkin' },
-                  { action: 'New incident reported', location: 'Barangay Lalo', time: '1 hour ago', type: 'incident' },
-                  { action: 'Patrol #3 maintenance completed', location: 'Workshop', time: '2 hours ago', type: 'maintenance' },
-                ].map((activity, idx) => (
-                  <div key={idx} className="flex items-start gap-3 pb-3 border-b last:border-0">
-                    <div className={`w-2 h-2 rounded-full mt-2 ${
-                      activity.type === 'dispatch' ? 'bg-warning' :
-                      activity.type === 'return' ? 'bg-status-available' :
-                      activity.type === 'incident' ? 'bg-status-critical' :
-                      'bg-primary'
-                    }`} />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium">{activity.action}</p>
-                      <p className="text-xs text-muted-foreground">{activity.location}</p>
+                {recentActivity.length > 0 ? (
+                  recentActivity.map((activity, idx) => (
+                    <div key={idx} className="flex items-start gap-3 pb-3 border-b last:border-0">
+                      <div className={`w-2 h-2 rounded-full mt-2 ${activity.type === 'dispatch' ? 'bg-warning' :
+                        activity.type === 'return' ? 'bg-status-available' :
+                          activity.type === 'incident' ? 'bg-status-critical' :
+                            'bg-primary'
+                        }`} />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium">{activity.action}</p>
+                        <p className="text-xs text-muted-foreground">{activity.location}</p>
+                      </div>
+                      <span className="text-xs text-muted-foreground whitespace-nowrap">{activity.time}</span>
                     </div>
-                    <span className="text-xs text-muted-foreground whitespace-nowrap">{activity.time}</span>
-                  </div>
-                ))}
+                  ))
+                ) : (
+                  <p className="text-sm text-muted-foreground text-center py-4">No recent activity</p>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -256,20 +358,13 @@ const Dashboard = () => {
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {[
-                  { message: 'Vehicle #5 low fuel', severity: 'warning', time: '5 mins ago' },
-                  { message: 'Maintenance overdue for Unit #3', severity: 'urgent', time: '1 hour ago' },
-                  { message: 'New incident in Barangay Lalo', severity: 'urgent', time: '1 hour ago' },
-                  { message: 'Driver training scheduled tomorrow', severity: 'info', time: '3 hours ago' },
-                  { message: 'Weekly inspection due Friday', severity: 'info', time: '1 day ago' },
-                ].map((alert, idx) => (
-                  <div 
-                    key={idx} 
-                    className={`p-3 rounded-lg border-l-4 ${
-                      alert.severity === 'urgent' ? 'bg-status-critical/5 border-l-status-critical' :
+                {systemAlerts.map((alert, idx) => (
+                  <div
+                    key={idx}
+                    className={`p-3 rounded-lg border-l-4 ${alert.severity === 'urgent' ? 'bg-status-critical/5 border-l-status-critical' :
                       alert.severity === 'warning' ? 'bg-warning/5 border-l-warning' :
-                      'bg-primary/5 border-l-primary'
-                    }`}
+                        'bg-primary/5 border-l-primary'
+                      }`}
                   >
                     <div className="flex items-start justify-between gap-2">
                       <p className="text-sm font-medium flex-1">{alert.message}</p>
@@ -289,8 +384,8 @@ const Dashboard = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Incidents This Month</p>
-                  <h3 className="text-3xl font-bold mt-2 text-warning">42</h3>
-                  <p className="text-xs text-status-available mt-1">↓ 12% from last month</p>
+                  <h3 className="text-3xl font-bold mt-2 text-warning">{monthlyIncidents}</h3>
+                  <p className="text-xs text-status-available mt-1">Total missions</p>
                 </div>
                 <div className="w-12 h-12 rounded-full bg-warning/10 flex items-center justify-center">
                   <AlertCircle className="w-6 h-6 text-warning" />
@@ -303,9 +398,9 @@ const Dashboard = () => {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-muted-foreground">Avg Response Time</p>
-                  <h3 className="text-3xl font-bold mt-2 text-secondary">8.5m</h3>
-                  <p className="text-xs text-status-available mt-1">↓ 2min faster</p>
+                  <p className="text-sm font-medium text-muted-foreground">Avg Mission Duration</p>
+                  <h3 className="text-3xl font-bold mt-2 text-secondary">{avgResponseTime}m</h3>
+                  <p className="text-xs text-status-available mt-1">Completed missions</p>
                 </div>
                 <div className="w-12 h-12 rounded-full bg-secondary/10 flex items-center justify-center">
                   <Activity className="w-6 h-6 text-secondary" />
@@ -318,9 +413,9 @@ const Dashboard = () => {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-muted-foreground">Active Drivers Today</p>
+                  <p className="text-sm font-medium text-muted-foreground">Active Responders</p>
                   <h3 className="text-3xl font-bold mt-2 text-primary">{stats.activeResponders}</h3>
-                  <p className="text-xs text-muted-foreground mt-1">Ready for deployment</p>
+                  <p className="text-xs text-muted-foreground mt-1">Drivers on Mission</p>
                 </div>
                 <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
                   <Users className="w-6 h-6 text-primary" />
@@ -338,31 +433,32 @@ const Dashboard = () => {
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 className="h-auto py-6 flex flex-col gap-2"
                 onClick={() => navigate('/vehicles')}
               >
                 <Truck className="w-6 h-6" />
                 <span className="text-sm">Add Vehicle</span>
               </Button>
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 className="h-auto py-6 flex flex-col gap-2"
                 onClick={() => navigate('/drivers')}
               >
                 <Users className="w-6 h-6" />
                 <span className="text-sm">Manage Drivers</span>
               </Button>
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 className="h-auto py-6 flex flex-col gap-2"
+                onClick={() => navigate('/missions')}
               >
                 <AlertCircle className="w-6 h-6" />
-                <span className="text-sm">Report Incident</span>
+                <span className="text-sm">Create Mission</span>
               </Button>
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 className="h-auto py-6 flex flex-col gap-2"
                 onClick={() => navigate('/analytics')}
               >

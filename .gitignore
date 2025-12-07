@@ -6,7 +6,7 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
-
+*.claude
 node_modules
 dist
 dist-ssr
@@ -23,3 +23,21 @@ dist-ssr
 *.sln
 *.sw?
 .env
+
+# Capacitor
+capacitor.config.ts.bak
+android/
+ios/
+*.apk
+*.aab
+
+# Android build files
+android/app/build/
+android/app/release/
+android/app/debug/
+android/.gradle/
+android/app/.cxx/
+android/local.properties
+android/build/
+*.keystore
+*.jks

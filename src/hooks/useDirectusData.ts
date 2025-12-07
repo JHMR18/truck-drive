@@ -7,12 +7,43 @@ export const useMissions = () => {
   return useQuery({
     queryKey: ['missions'],
     queryFn: async () => {
-      return await directus.request(
+      const missions = await directus.request(
         readItems('missions', {
-          fields: ['*', 'assigned_vehicle_id.*', 'assigned_driver_id.*'],
+          fields: ['*', 'assigned_driver_id.*'],
           sort: ['-start_time'],
         })
       );
+
+      // Get driver profiles to fetch assigned vehicles
+      const driverIds = missions
+        .filter(m => m.assigned_driver_id)
+        .map(m => m.assigned_driver_id.id);
+
+      let driverProfiles = [];
+      if (driverIds.length > 0) {
+        driverProfiles = await directus.request(
+          readItems('driver_profiles', {
+            fields: ['*', 'user_id', 'assigned_vehicle_id.*'],
+            filter: {
+              user_id: {
+                _in: driverIds
+              }
+            }
+          })
+        );
+      }
+
+      // Merge vehicle information from driver profiles
+      return missions.map((mission: any) => {
+        const driverProfile = driverProfiles.find(
+          profile => profile.user_id === mission.assigned_driver_id?.id
+        );
+
+        return {
+          ...mission,
+          assigned_vehicle_id: driverProfile?.assigned_vehicle_id || null
+        };
+      });
     },
   });
 };
@@ -102,9 +133,9 @@ export const useDrivers = () => {
           fields: ['*', 'role.*'],
         })
       );
-      
+
       console.log('All users:', users);
-      
+
       // Filter for drivers - role might be an ID or object
       const drivers = users.filter((user: any) => {
         if (typeof user.role === 'string') {
@@ -113,7 +144,7 @@ export const useDrivers = () => {
         }
         return user.role?.name === 'Driver';
       });
-      
+
       console.log('Filtered drivers:', drivers);
       return drivers;
     },
