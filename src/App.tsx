@@ -17,6 +17,7 @@ import NotificationsPage from "./pages/NotificationsPage";
 import DriverDashboard from "./pages/DriverDashboard";
 import DriverVehicleStatus from "./pages/DriverVehicleStatus";
 import DriverCommunication from "./pages/DriverCommunication";
+import DriverProfile from "./pages/DriverProfile";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -24,19 +25,19 @@ const queryClient = new QueryClient();
 // Root redirect component
 const RootRedirect = () => {
   const { user, role, loading } = useDirectusAuth();
-  
+
   if (loading) {
     return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
   }
-  
+
   if (!user) {
     return <Navigate to="/auth" replace />;
   }
-  
+
   if (role === 'Driver') {
     return <Navigate to="/driver/dashboard" replace />;
   }
-  
+
   return <Navigate to="/dashboard" replace />;
 };
 
@@ -50,7 +51,7 @@ const App = () => (
           <Routes>
             <Route path="/" element={<RootRedirect />} />
             <Route path="/auth" element={<Auth />} />
-            
+
             {/* Admin Routes */}
             <Route
               path="/dashboard"
@@ -122,7 +123,7 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
-            
+
             {/* Driver Routes */}
             <Route
               path="/driver/dashboard"
@@ -154,7 +155,17 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
-            
+            <Route
+              path="/driver/profile"
+              element={
+                <ProtectedRoute allowedRoles={['Driver']}>
+                  <AppLayout>
+                    <DriverProfile />
+                  </AppLayout>
+                </ProtectedRoute>
+              }
+            />
+
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

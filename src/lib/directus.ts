@@ -1,4 +1,5 @@
 import { createDirectus, rest, authentication, staticToken } from '@directus/sdk';
+import { logApiCall, logApiResponse, logApiError } from './apiLogger';
 
 // Define schema types
 export interface User {
@@ -91,19 +92,41 @@ export interface DirectusSchema {
 // Create Directus client
 const directusUrl = import.meta.env.VITE_DIRECTUS_URL || 'http://localhost:8055';
 
-// Create a custom fetch that adds the Authorization header
-const customFetch = (url: RequestInfo | URL, options: RequestInit = {}): Promise<Response> => {
+// Create a custom fetch that adds the Authorization header and logs details
+const customFetch = async (url: RequestInfo | URL, options: RequestInit = {}): Promise<Response> => {
   const token = localStorage.getItem('directus_access_token');
-  
+  const urlStr = url.toString();
+
   const headers = new Headers(options.headers);
   if (token) {
     headers.set('Authorization', `Bearer ${token}`);
   }
-  
-  return fetch(url, {
-    ...options,
-    headers,
-  });
+
+  // Log the request
+  logApiCall(options.method || 'GET', urlStr, options.body);
+
+  try {
+    const response = await fetch(url, {
+      ...options,
+      headers,
+    });
+
+    // Log response details
+    const responseClone = response.clone();
+    let responseData;
+    try {
+      responseData = await responseClone.json();
+    } catch (e) {
+      responseData = await responseClone.text();
+    }
+
+    logApiResponse(response, responseData);
+
+    return response;
+  } catch (error) {
+    logApiError(error, urlStr);
+    throw error;
+  }
 };
 
 export const directus = createDirectus<DirectusSchema>(directusUrl, {

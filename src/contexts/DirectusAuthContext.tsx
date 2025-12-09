@@ -1,6 +1,8 @@
 import { createContext, useContext, useEffect, useState, ReactNode, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Capacitor } from '@capacitor/core';
 import { directus, User } from '@/lib/directus';
+import { directus as directusMobile } from '@/lib/directus-mobile';
 import { readMe, logout } from '@directus/sdk';
 
 export type UserRole = 'Super Admin' | 'Dispatcher' | 'Maintenance Officer' | 'Driver';
@@ -69,7 +71,11 @@ export const DirectusAuthProvider = ({ children }: { children: ReactNode }) => {
         throw new Error('No refresh token available');
       }
 
-      const response = await fetch(`${import.meta.env.VITE_DIRECTUS_URL || 'http://localhost:8055'}/auth/refresh`, {
+      // Use mobile config on mobile platforms
+      const baseUrl = Capacitor.getPlatform() === 'android' ? 'http://192.168.101.84:8055' : (import.meta.env.VITE_DIRECTUS_URL || 'http://localhost:8055');
+      console.log(`[Auth] Using base URL for refresh: ${baseUrl}`);
+
+      const response = await fetch(`${baseUrl}/auth/refresh`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -99,7 +105,11 @@ export const DirectusAuthProvider = ({ children }: { children: ReactNode }) => {
         throw new Error('No access token');
       }
 
-      const response = await fetch(`${import.meta.env.VITE_DIRECTUS_URL || 'http://localhost:8055'}/users/me?fields=*,role.name`, {
+      // Use mobile config on mobile platforms
+      const baseUrl = Capacitor.getPlatform() === 'android' ? 'http://192.168.101.84:8055' : (import.meta.env.VITE_DIRECTUS_URL || 'http://localhost:8055');
+      console.log(`[Auth] Using base URL for fetchUser: ${baseUrl}`);
+
+      const response = await fetch(`${baseUrl}/users/me?fields=*,role.name`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -164,7 +174,11 @@ export const DirectusAuthProvider = ({ children }: { children: ReactNode }) => {
 
   const signIn = async (email: string, password: string) => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_DIRECTUS_URL || 'http://localhost:8055'}/auth/login`, {
+      // Use mobile config on mobile platforms
+      const baseUrl = Capacitor.getPlatform() === 'android' ? 'http://192.168.101.84:8055' : (import.meta.env.VITE_DIRECTUS_URL || 'http://localhost:8055');
+      console.log(`[Auth] Using base URL for login: ${baseUrl}`);
+
+      const response = await fetch(`${baseUrl}/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -194,7 +208,11 @@ export const DirectusAuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       const refreshToken = getRefreshToken();
       if (refreshToken) {
-        await fetch(`${import.meta.env.VITE_DIRECTUS_URL || 'http://localhost:8055'}/auth/logout`, {
+        // Use mobile config on mobile platforms
+        const baseUrl = Capacitor.getPlatform() === 'android' ? 'http://192.168.101.84:8055' : (import.meta.env.VITE_DIRECTUS_URL || 'http://localhost:8055');
+        console.log(`[Auth] Using base URL for logout: ${baseUrl}`);
+
+        await fetch(`${baseUrl}/auth/logout`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

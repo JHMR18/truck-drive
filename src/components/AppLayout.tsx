@@ -94,6 +94,17 @@ export const AppLayout = ({ children }: LayoutProps) => {
     </>
   );
 
+  const getPageTitle = () => {
+    const currentItem = navItems.find(item => item.path === location.pathname);
+    if (currentItem) return currentItem.label;
+
+    // Fallback for non-exact matches or other routes
+    if (location.pathname.startsWith('/driver/dashboard')) return 'My Missions';
+    if (location.pathname.includes('/dashboard')) return 'Dashboard';
+
+    return 'Vehicle Tracking';
+  };
+
   return (
     <div className="flex h-screen bg-background">
       {/* Desktop Sidebar */}
@@ -117,7 +128,7 @@ export const AppLayout = ({ children }: LayoutProps) => {
         </Sheet>
         <div className="flex items-center gap-2 ml-4">
           <Truck className="h-5 w-5 text-primary" />
-          <h1 className="font-semibold">Vehicle Tracking</h1>
+          <h1 className="font-semibold">{getPageTitle()}</h1>
         </div>
       </header>
 

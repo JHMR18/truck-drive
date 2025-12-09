@@ -22,13 +22,27 @@ export default function DriverDashboard() {
 
   const myMissions = missions?.filter((m: any) => {
     // assigned_driver_id might be an object or just an ID
-    const driverIdInMission = typeof m.assigned_driver_id === 'object' 
-      ? m.assigned_driver_id?.id 
+    const driverIdInMission = typeof m.assigned_driver_id === 'object'
+      ? m.assigned_driver_id?.id
       : m.assigned_driver_id;
-    
+
     console.log('Mission driver ID:', driverIdInMission, 'My ID:', user?.id);
-    
-    return driverIdInMission === user?.id && m.status !== 'Completed';
+
+    return driverIdInMission === user?.id; // Show all missions for this driver
+  })?.sort((a: any, b: any) => {
+    // Sort logic: 
+    // 1. Active statuses ('In Progress', 'Delayed', 'Planned') come before 'Completed'
+    // 2. Within active, sort by start_time (newest first)
+    // 3. Completed missions come last, sorted by start_time (newest first)
+
+    const isCompletedA = a.status === 'Completed';
+    const isCompletedB = b.status === 'Completed';
+
+    if (isCompletedA && !isCompletedB) return 1;
+    if (!isCompletedA && isCompletedB) return -1;
+
+    // If both have same completed status, sort by date (newest first)
+    return new Date(b.start_time || b.date_created).getTime() - new Date(a.start_time || a.date_created).getTime();
   });
 
   console.log('Filtered missions for driver:', myMissions);
@@ -75,8 +89,8 @@ export default function DriverDashboard() {
       {driverProfile?.assigned_vehicle_id && (
         <LocationTracker
           vehicleId={
-            typeof driverProfile.assigned_vehicle_id === 'object' 
-              ? driverProfile.assigned_vehicle_id.id 
+            typeof driverProfile.assigned_vehicle_id === 'object'
+              ? driverProfile.assigned_vehicle_id.id
               : driverProfile.assigned_vehicle_id
           }
           driverId={user?.id}
@@ -114,7 +128,7 @@ export default function DriverDashboard() {
         )}
 
         <div>
-          <h2 className="text-2xl font-bold mb-4">Active Missions</h2>
+          <h2 className="text-2xl font-bold mb-4">My Missions</h2>
           {myMissions && myMissions.length > 0 ? (
             <div className="space-y-4">
               {myMissions.map((mission: any) => (

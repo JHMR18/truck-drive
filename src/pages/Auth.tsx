@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { Shield, Loader2, Truck } from 'lucide-react';
+import { NetworkTest } from '@/components/NetworkTest';
 
 const Auth = () => {
   const [loading, setLoading] = useState(false);
@@ -108,6 +109,11 @@ const Auth = () => {
               )}
             </Button>
           </form>
+
+          {/* Debug Network Test - Remove in production */}
+          <div className="mt-4">
+            <NetworkTest />
+          </div>
         </CardContent>
       </Card>
     </div>
