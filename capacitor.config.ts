@@ -1,8 +1,8 @@
 import { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'com.truckdrive.app',
-  appName: 'Truck Drive Management',
+  appId: 'com.trackdrive.app',
+  appName: 'Track Drive',
   webDir: 'dist',
   server: {
     androidScheme: 'http',
@@ -32,7 +32,10 @@ const config: CapacitorConfig = {
       backgroundColor: '#1e40af'
     },
     App: {
-      appendUserAgent: 'TruckDriveApp/1.0'
+      appendUserAgent: 'TrackDriveApp/1.0'
+    },
+    Geolocation: {
+      requestPermissions: true
     }
   }
 };

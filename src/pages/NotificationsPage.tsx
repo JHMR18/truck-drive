@@ -6,12 +6,13 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Label } from '@/components/ui/label';
-import { Bell, Send, AlertCircle, MessageSquare } from 'lucide-react';
+import { Bell, Send, AlertCircle, MessageSquare, Radio, User } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 export default function NotificationsPage() {
-  const { user } = useDirectusAuth();
+  const { user, isAdmin } = useDirectusAuth();
   const { data: notifications } = useNotifications(user?.id);
   const createNotification = useCreateNotification();
   const markAsRead = useMarkNotificationRead();
@@ -56,7 +57,7 @@ export default function NotificationsPage() {
       case 'SOS':
         return <AlertCircle className="h-5 w-5 text-red-600" />;
       case 'Broadcast':
-        return <Bell className="h-5 w-5 text-blue-500" />;
+        return <Radio className="h-5 w-5 text-blue-500" />;
       case 'Instruction':
         return <MessageSquare className="h-5 w-5 text-green-500" />;
       default:
@@ -64,7 +65,76 @@ export default function NotificationsPage() {
     }
   };
 
-  const unreadCount = notifications?.filter((n: any) => n.status === 'Delivered').length || 0;
+  // Get sender display name
+  const getSenderName = (sender: any) => {
+    if (!sender) return 'Unknown';
+    if (sender.first_name && sender.last_name) {
+      return `${sender.first_name} ${sender.last_name}`;
+    }
+    return sender.email || 'Unknown';
+  };
+
+  // Filter notifications by type
+  const broadcastNotifications = notifications?.filter(n => n.type === 'Broadcast') || [];
+  const sosNotifications = notifications?.filter(n => n.type === 'SOS') || [];
+  const unreadBroadcastCount = broadcastNotifications.filter((n: any) => n.status === 'Delivered').length;
+  const unreadSosCount = sosNotifications.filter((n: any) => n.status === 'Delivered').length;
+
+  const renderNotification = (notification: any) => (
+    <Card
+      key={notification.id}
+      className={
+        notification.status === 'Delivered'
+          ? 'border-l-4 border-l-blue-500 bg-blue-50'
+          : ''
+      }
+    >
+      <CardHeader>
+        <div className="flex items-start justify-between">
+          <div className="flex items-start gap-3 flex-1">
+            {getNotificationIcon(notification.type)}
+            <div className="flex-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <Badge
+                  variant={
+                    notification.type === 'SOS' ? 'destructive' : 'default'
+                  }
+                >
+                  {notification.type}
+                </Badge>
+                {notification.status === 'Delivered' && (
+                  <Badge variant="outline">Unread</Badge>
+                )}
+              </div>
+              <div className="flex items-center gap-2 mt-1">
+                <p className="text-sm text-gray-600">
+                  {new Date(notification.timestamp).toLocaleString()}
+                </p>
+                {notification.type === 'SOS' && notification.sender_id && (
+                  <div className="flex items-center gap-1 text-sm text-gray-600">
+                    <User className="h-3 w-3" />
+                    <span>From: {getSenderName(notification.sender_id)}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <p className="text-gray-800 mb-4">{notification.message}</p>
+        {notification.status === 'Delivered' && !isAdmin && (
+          <Button
+            onClick={() => markAsRead.mutate(notification.id)}
+            variant="outline"
+            size="sm"
+          >
+            Mark as Read
+          </Button>
+        )}
+      </CardContent>
+    </Card>
+  );
 
   return (
     <div className="min-h-screen bg-gray-50 p-4">
@@ -73,7 +143,7 @@ export default function NotificationsPage() {
           <div>
             <h1 className="text-3xl font-bold">Notifications</h1>
             <p className="text-gray-600">
-              {unreadCount} unread notification{unreadCount !== 1 ? 's' : ''}
+              Manage broadcast messages and monitor SOS alerts
             </p>
           </div>
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
@@ -110,64 +180,82 @@ export default function NotificationsPage() {
           </Dialog>
         </div>
 
-        <div className="space-y-4">
-          {notifications && notifications.length > 0 ? (
-            notifications.map((notification: any) => (
-              <Card
-                key={notification.id}
-                className={
-                  notification.status === 'Delivered'
-                    ? 'border-l-4 border-l-blue-500 bg-blue-50'
-                    : ''
-                }
-              >
-                <CardHeader>
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-start gap-3 flex-1">
-                      {getNotificationIcon(notification.type)}
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <Badge
-                            variant={
-                              notification.type === 'SOS' ? 'destructive' : 'default'
-                            }
-                          >
-                            {notification.type}
-                          </Badge>
-                          {notification.status === 'Delivered' && (
-                            <Badge variant="outline">Unread</Badge>
-                          )}
-                        </div>
-                        <p className="text-sm text-gray-600 mt-1">
-                          {new Date(notification.timestamp).toLocaleString()}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-gray-800 mb-4">{notification.message}</p>
-                  {notification.status === 'Delivered' && (
-                    <Button
-                      onClick={() => markAsRead.mutate(notification.id)}
-                      variant="outline"
-                      size="sm"
-                    >
-                      Mark as Read
-                    </Button>
-                  )}
-                </CardContent>
-              </Card>
-            ))
-          ) : (
+        <Tabs defaultValue="broadcast" className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="broadcast" className="flex items-center gap-2">
+              <Radio className="h-4 w-4" />
+              Broadcast Messages
+              {unreadBroadcastCount > 0 && (
+                <Badge variant="secondary" className="ml-1">
+                  {unreadBroadcastCount}
+                </Badge>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="sos" className="flex items-center gap-2">
+              <AlertCircle className="h-4 w-4" />
+              SOS Alerts
+              {unreadSosCount > 0 && (
+                <Badge variant="destructive" className="ml-1">
+                  {unreadSosCount}
+                </Badge>
+              )}
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="broadcast" className="space-y-4">
             <Card>
-              <CardContent className="py-12 text-center">
-                <Bell className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-                <p className="text-gray-600">No notifications</p>
-              </CardContent>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Radio className="h-5 w-5" />
+                  Broadcast Messages
+                </CardTitle>
+                <CardDescription>
+                  Messages sent to all users in the system
+                </CardDescription>
+              </CardHeader>
             </Card>
-          )}
-        </div>
+
+            <div className="space-y-4">
+              {broadcastNotifications.length > 0 ? (
+                broadcastNotifications.map(renderNotification)
+              ) : (
+                <Card>
+                  <CardContent className="py-12 text-center">
+                    <Radio className="h-12 w-12 mx-auto text-gray-400 mb-4" />
+                    <p className="text-gray-600">No broadcast messages</p>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="sos" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-red-600">
+                  <AlertCircle className="h-5 w-5" />
+                  SOS Emergency Alerts
+                </CardTitle>
+                <CardDescription>
+                  Emergency alerts sent by drivers requiring immediate attention
+                </CardDescription>
+              </CardHeader>
+            </Card>
+
+            <div className="space-y-4">
+              {sosNotifications.length > 0 ? (
+                sosNotifications.map(renderNotification)
+              ) : (
+                <Card>
+                  <CardContent className="py-12 text-center">
+                    <AlertCircle className="h-12 w-12 mx-auto text-gray-400 mb-4" />
+                    <p className="text-gray-600">No SOS alerts</p>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );

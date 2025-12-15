@@ -17,33 +17,69 @@ const Analytics = () => {
   const analytics = useMemo(() => {
     if (missionsLoading || vehiclesLoading || driversLoading) return null;
 
+    console.log('=== ANALYTICS DEBUG ===');
+    console.log('All missions:', missions);
+    console.log('Missions length:', missions.length);
+    console.log('Missions loading:', missionsLoading);
+
     const totalMissions = missions.length;
     const completedMissions = missions.filter((m: any) => m.status === 'Completed').length;
 
     // 1. Monthly Trends (Last 6 Months)
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     const today = new Date();
+    console.log('Today:', today.toISOString());
+
     const last6Months = [];
     for (let i = 5; i >= 0; i--) {
       const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
-      last6Months.push({
+      const monthData = {
         month: months[d.getMonth()],
         year: d.getFullYear(), // Keep track for filtering
         monthIndex: d.getMonth(),
         dispatches: 0
-      });
+      };
+      last6Months.push(monthData);
+      console.log(`Month ${i}:`, monthData);
     }
 
+    console.log('Processing missions for monthly trends...');
     missions.forEach((m: any) => {
-      const d = new Date(m.date_created);
+      console.log('Processing mission:', m);
+
+      // Try different date fields, prioritizing date_created, then start_time, then fallback
+      let dateToUse = m.date_created || m.start_time || m.date_created;
+      console.log('Raw date field:', dateToUse);
+
+      if (!dateToUse) {
+        console.log('No date found for mission, skipping');
+        return;
+      }
+
+      const d = new Date(dateToUse);
+
+      // Check if date is valid
+      if (isNaN(d.getTime())) {
+        console.log('Invalid date for mission:', dateToUse, 'skipping');
+        return;
+      }
+
+      console.log('Mission date:', d.toISOString());
       const monthIndex = d.getMonth();
       const year = d.getFullYear();
 
       const monthData = last6Months.find(item => item.monthIndex === monthIndex && item.year === year);
+      console.log('Found month data:', monthData);
       if (monthData) {
         monthData.dispatches++;
+        console.log('Updated dispatches for', monthData.month, monthData.year, ':', monthData.dispatches);
+      } else {
+        console.log('No matching month found for', dateToUse);
       }
     });
+
+    console.log('Final last6Months data:', last6Months);
+    console.log('Any month with dispatches > 0:', last6Months.some((m: any) => m.dispatches > 0));
 
     // 2. Response Time Stats
     let totalDuration = 0;
@@ -252,36 +288,93 @@ const Analytics = () => {
         {/* Monthly Mission Trends */}
         <Card className="shadow-card">
           <CardHeader>
-            <CardTitle>Monthly Mission Trends</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              <BarChart3 className="w-5 h-5" />
+              Monthly Mission Trends
+            </CardTitle>
             <CardDescription>Total missions per month (last 6 months)</CardDescription>
           </CardHeader>
           <CardContent>
-            {analytics.last6Months.some((m: any) => m.dispatches > 0) ? (
-              <div className="h-64 flex items-end justify-around gap-4 px-4">
-                {analytics.last6Months.map((item: any, index: number) => {
-                  const maxValue = Math.max(...analytics.last6Months.map((d: any) => d.dispatches), 1);
-                  const height = (item.dispatches / maxValue) * 100;
-                  return (
-                    <div key={index} className="flex flex-col items-center flex-1 gap-2">
-                      <div className="text-sm font-medium text-primary">{item.dispatches}</div>
-                      <div
-                        className="w-full bg-gradient-to-t from-primary to-primary/60 rounded-t-lg transition-all hover:opacity-80 animate-in fade-in slide-in-from-bottom-4"
-                        style={{
-                          height: `${height}%`,
-                          minHeight: '4px', // Ensure visibility even if 0
-                          animationDelay: `${index * 0.1}s`
-                        }}
-                      />
-                      <div className="text-xs text-muted-foreground">{item.month}</div>
-                    </div>
-                  );
-                })}
+            {(() => {
+              console.log('=== RENDER DEBUG ===');
+              console.log('Analytics object:', analytics);
+              console.log('Analytics.last6Months:', analytics.last6Months);
+              console.log('Some condition result:', analytics.last6Months.some((m: any) => m.dispatches > 0));
+              console.log('Detailed month data:');
+              analytics.last6Months.forEach((month: any, index: number) => {
+                console.log(`Month ${index}:`, month.month, month.year, 'dispatches:', month.dispatches);
+              });
+
+              return analytics.last6Months.some((m: any) => m.dispatches > 0);
+            })() ? (
+              <div className="h-80 relative">
+                {/* Y-axis grid lines and labels */}
+                <div className="absolute inset-0 flex flex-col justify-between">
+                  {[4, 3, 2, 1, 0].map((value) => {
+                    const maxValue = Math.max(...analytics.last6Months.map((d: any) => d.dispatches), 1);
+                    const displayValue = Math.round((maxValue / 4) * value);
+                    return (
+                      <div key={value} className="flex items-center">
+                        <div className="w-12 text-xs text-muted-foreground text-right pr-2">
+                          {displayValue}
+                        </div>
+                        <div className="flex-1 h-px bg-gray-100" />
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Bars */}
+                <div className="absolute inset-0 flex items-end justify-around gap-4 px-16 pb-8">
+                  {analytics.last6Months.map((item: any, index: number) => {
+                    const maxValue = Math.max(...analytics.last6Months.map((d: any) => d.dispatches), 1);
+                    const height = (item.dispatches / maxValue) * 100;
+                    return (
+                      <div key={index} className="flex flex-col items-center flex-1 gap-2 relative group">
+                        {/* Value label on hover */}
+                        <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-primary text-primary-foreground px-2 py-1 rounded text-xs font-medium opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                          {item.dispatches} missions
+                        </div>
+
+                        {/* Bar */}
+                        <div
+                          className="w-full bg-gradient-to-t from-primary via-primary/80 to-primary/60 rounded-t-lg transition-all hover:from-primary/90 hover:via-primary/70 hover:to-primary/50 hover:scale-105 animate-in fade-in slide-in-from-bottom-4 relative cursor-pointer shadow-lg hover:shadow-xl"
+                          style={{
+                            height: `${height}%`,
+                            minHeight: item.dispatches > 0 ? '8px' : '0px',
+                            animationDelay: `${index * 0.1}s`
+                          }}
+                        >
+                          {/* Glow effect for non-zero bars */}
+                          {item.dispatches > 0 && (
+                            <div className="absolute inset-0 bg-primary/20 rounded-t-lg animate-pulse" />
+                          )}
+                        </div>
+
+                        {/* Month label */}
+                        <div className="text-xs font-medium text-gray-700 mt-2">{item.month}</div>
+
+                        {/* Year label if different from current year */}
+                        {item.year !== new Date().getFullYear() && (
+                          <div className="text-xs text-muted-foreground">{item.year}</div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* X-axis line */}
+                <div className="absolute bottom-8 left-16 right-8 h-px bg-gray-300" />
+
+                {/* Zero label */}
+                <div className="absolute bottom-8 left-2 text-xs text-muted-foreground">0</div>
               </div>
             ) : (
-              <div className="h-64 flex items-center justify-center text-muted-foreground">
+              <div className="h-80 flex items-center justify-center text-muted-foreground">
                 <div className="text-center">
-                  <BarChart3 className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                  <p>No mission data available for the last 6 months</p>
+                  <BarChart3 className="w-16 h-16 mx-auto mb-4 opacity-30" />
+                  <p className="text-lg font-medium mb-1">No mission data available</p>
+                  <p className="text-sm">Mission statistics will appear here once missions are completed</p>
                 </div>
               </div>
             )}

@@ -7,7 +7,6 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { Shield, Loader2, Truck } from 'lucide-react';
-import { NetworkTest } from '@/components/NetworkTest';
 
 const Auth = () => {
   const [loading, setLoading] = useState(false);
@@ -46,7 +45,7 @@ const Auth = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-green-50 to-yellow-50 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-green-50 to-yellow-50 p-4 safe-area">
       <Card className="w-full max-w-md shadow-2xl border-t-4 border-t-blue-600">
         <CardHeader className="text-center space-y-4">
           <div className="flex justify-center mb-2">
@@ -109,11 +108,6 @@ const Auth = () => {
               )}
             </Button>
           </form>
-
-          {/* Debug Network Test - Remove in production */}
-          <div className="mt-4">
-            <NetworkTest />
-          </div>
         </CardContent>
       </Card>
     </div>

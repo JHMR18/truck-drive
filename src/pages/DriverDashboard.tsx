@@ -48,8 +48,15 @@ export default function DriverDashboard() {
   console.log('Filtered missions for driver:', myMissions);
 
   const handleUpdateStatus = (missionId: string, status: string) => {
+    const updateData: any = { status };
+
+    // If the mission is being completed, set the end_time
+    if (status === 'Completed') {
+      updateData.end_time = new Date().toISOString();
+    }
+
     updateMission.mutate(
-      { id: missionId, data: { status } },
+      { id: missionId, data: updateData },
       {
         onSuccess: () => {
           toast({
@@ -173,6 +180,14 @@ export default function DriverDashboard() {
                             : 'Not started'}
                         </span>
                       </div>
+                      {mission.end_time && (
+                        <div className="flex items-center gap-1">
+                          <Clock className="h-4 w-4" />
+                          <span className="text-green-600">
+                            Completed: {new Date(mission.end_time).toLocaleString()}
+                          </span>
+                        </div>
+                      )}
                     </div>
 
                     <div className="flex gap-2">

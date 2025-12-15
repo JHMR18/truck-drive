@@ -265,6 +265,7 @@ const Drivers = () => {
       
       // Find profile by matching user_id to driver.id
       const profile = driverProfiles?.find((p: any) => {
+        if (!p.user_id) return false;
         const userId = typeof p.user_id === 'object' ? p.user_id.id : p.user_id;
         return userId === driver.id;
       });
@@ -408,8 +409,9 @@ const Drivers = () => {
                           // Show vehicles that are either:
                           // 1. Currently assigned to this driver (if editing)
                           // 2. Not deployed (available for assignment)
-                          const currentlyAssignedToThisDriver = editingDriver && 
+                          const currentlyAssignedToThisDriver = editingDriver &&
                             driverProfiles?.some((p: any) => {
+                              if (!p.user_id) return false;
                               const userId = typeof p.user_id === 'object' ? p.user_id.id : p.user_id;
                               const vehicleId = typeof p.assigned_vehicle_id === 'object' ? p.assigned_vehicle_id?.id : p.assigned_vehicle_id;
                               return userId === editingDriver.id && vehicleId === vehicle.id;
@@ -474,6 +476,7 @@ const Drivers = () => {
                 <TableBody>
                   {drivers?.map((driver: any) => {
                     const profile = driverProfiles?.find((p: any) => {
+                      if (!p.user_id) return false;
                       const userId = typeof p.user_id === 'object' ? p.user_id.id : p.user_id;
                       return userId === driver.id;
                     });
@@ -538,6 +541,7 @@ const Drivers = () => {
             <div className="md:hidden space-y-4">
               {drivers?.map((driver: any) => {
                 const profile = driverProfiles?.find((p: any) => {
+                  if (!p.user_id) return false;
                   const userId = typeof p.user_id === 'object' ? p.user_id.id : p.user_id;
                   return userId === driver.id;
                 });

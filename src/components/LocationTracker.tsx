@@ -48,6 +48,7 @@ export const LocationTracker = ({ vehicleId, driverId }: LocationTrackerProps) =
   }, [locationLogs, vehicleId, driverId]);
 
   useEffect(() => {
+    // Always track location when logged in
     if (position && (vehicleId || driverId)) {
       const updateLocation = () => {
         const locationData = {
@@ -85,8 +86,8 @@ export const LocationTracker = ({ vehicleId, driverId }: LocationTrackerProps) =
       // Update immediately
       updateLocation();
 
-      // Update every 10 seconds
-      const interval = setInterval(updateLocation, 10000);
+      // Update every 3 seconds
+      const interval = setInterval(updateLocation, 3000);
 
       return () => clearInterval(interval);
     }

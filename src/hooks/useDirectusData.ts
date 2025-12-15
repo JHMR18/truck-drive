@@ -260,9 +260,18 @@ export const useNotifications = (userId?: string) => {
   return useQuery({
     queryKey: ['notifications', userId],
     queryFn: async () => {
+      // Filter to get notifications sent to this user OR broadcast notifications (no recipient_id)
+      const filter = userId ? {
+        _or: [
+          { recipient_id: { _eq: userId } },
+          { recipient_id: { _null: true } }
+        ]
+      } : {};
+
       return await directus.request(
         readItems('notifications', {
-          filter: userId ? { recipient_id: { _eq: userId } } : {},
+          filter,
+          fields: ['*', 'sender_id.first_name', 'sender_id.last_name', 'sender_id.email'],
           sort: ['-timestamp'],
           limit: 50,
         })

@@ -6,6 +6,8 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { DirectusAuthProvider, useDirectusAuth } from "@/contexts/DirectusAuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AppLayout } from "@/components/AppLayout";
+import { requestPermissions } from "@/utils/permissions";
+import { useEffect } from "react";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import VehicleTracking from "./pages/VehicleTracking";
@@ -21,6 +23,26 @@ import DriverProfile from "./pages/DriverProfile";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
+
+// Permission request component
+const PermissionRequester = () => {
+  useEffect(() => {
+    const requestAppPermissions = async () => {
+      try {
+        await requestPermissions();
+        console.log('Permissions requested successfully');
+      } catch (error) {
+        console.error('Error requesting permissions:', error);
+      }
+    };
+
+    // Request permissions shortly after app starts
+    const timer = setTimeout(requestAppPermissions, 1000);
+    return () => clearTimeout(timer);
+  }, []);
+
+  return null;
+};
 
 // Root redirect component
 const RootRedirect = () => {
@@ -48,6 +70,7 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <DirectusAuthProvider>
+          <PermissionRequester />
           <Routes>
             <Route path="/" element={<RootRedirect />} />
             <Route path="/auth" element={<Auth />} />
@@ -56,7 +79,7 @@ const App = () => (
             <Route
               path="/dashboard"
               element={
-                <ProtectedRoute allowedRoles={['Super Admin', 'Dispatcher', 'Maintenance Officer']}>
+                <ProtectedRoute allowedRoles={['Administrator', 'Dispatcher', 'Maintenance Officer']}>
                   <AppLayout>
                     <Dashboard />
                   </AppLayout>
@@ -66,7 +89,7 @@ const App = () => (
             <Route
               path="/tracking"
               element={
-                <ProtectedRoute allowedRoles={['Super Admin', 'Dispatcher']}>
+                <ProtectedRoute allowedRoles={['Administrator', 'Dispatcher']}>
                   <AppLayout>
                     <VehicleTracking />
                   </AppLayout>
@@ -76,7 +99,7 @@ const App = () => (
             <Route
               path="/vehicles"
               element={
-                <ProtectedRoute allowedRoles={['Super Admin', 'Dispatcher', 'Maintenance Officer']}>
+                <ProtectedRoute allowedRoles={['Administrator', 'Dispatcher', 'Maintenance Officer']}>
                   <AppLayout>
                     <Vehicles />
                   </AppLayout>
@@ -86,7 +109,7 @@ const App = () => (
             <Route
               path="/drivers"
               element={
-                <ProtectedRoute allowedRoles={['Super Admin', 'Dispatcher']}>
+                <ProtectedRoute allowedRoles={['Administrator', 'Dispatcher']}>
                   <AppLayout>
                     <Drivers />
                   </AppLayout>
@@ -96,7 +119,7 @@ const App = () => (
             <Route
               path="/missions"
               element={
-                <ProtectedRoute allowedRoles={['Super Admin', 'Dispatcher']}>
+                <ProtectedRoute allowedRoles={['Administrator', 'Dispatcher']}>
                   <AppLayout>
                     <Missions />
                   </AppLayout>
@@ -106,7 +129,7 @@ const App = () => (
             <Route
               path="/notifications"
               element={
-                <ProtectedRoute allowedRoles={['Super Admin', 'Dispatcher']}>
+                <ProtectedRoute allowedRoles={['Administrator', 'Dispatcher']}>
                   <AppLayout>
                     <NotificationsPage />
                   </AppLayout>
@@ -116,7 +139,7 @@ const App = () => (
             <Route
               path="/analytics"
               element={
-                <ProtectedRoute allowedRoles={['Super Admin']}>
+                <ProtectedRoute allowedRoles={['Administrator']}>
                   <AppLayout>
                     <Analytics />
                   </AppLayout>

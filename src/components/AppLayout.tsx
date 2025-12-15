@@ -113,7 +113,7 @@ export const AppLayout = ({ children }: LayoutProps) => {
       </aside>
 
       {/* Mobile Header */}
-      <header className="md:hidden fixed top-0 left-0 right-0 z-50 bg-card border-b h-16 flex items-center px-4">
+      <header className="md:hidden fixed top-0 left-0 right-0 z-50 bg-card border-b h-16 flex items-center px-4 safe-top">
         <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
           <SheetTrigger asChild>
             <Button variant="ghost" size="icon">
