@@ -208,7 +208,7 @@ export const useUpdateDriverProfile = () => {
 };
 
 // Location tracking
-export const useLocationLogs = () => {
+export const useLocationLogs = (refetchInterval = 10000) => {
   return useQuery({
     queryKey: ['location_logs'],
     queryFn: async () => {
@@ -219,7 +219,7 @@ export const useLocationLogs = () => {
         })
       );
     },
-    refetchInterval: 10000, // Refetch every 10 seconds
+    refetchInterval,
   });
 };
 

@@ -16,7 +16,7 @@ const VehicleTracking = () => {
   const { user, loading: authLoading } = useDirectusAuth();
   const navigate = useNavigate();
   const { data: vehicles, isLoading: vehiclesLoading, refetch } = useVehicles();
-  const { data: locationLogs, isLoading: logsLoading } = useLocationLogs();
+  const { data: locationLogs, isLoading: logsLoading } = useLocationLogs(1000);
   const [filteredVehicles, setFilteredVehicles] = useState<any[]>([]);
   const [vehiclesWithLocation, setVehiclesWithLocation] = useState<any[]>([]);
   const [viewMode, setViewMode] = useState<'map' | 'list'>('map');
@@ -24,7 +24,7 @@ const VehicleTracking = () => {
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [refreshing, setRefreshing] = useState(false);
   const [selectedVehicle, setSelectedVehicle] = useState<any>(null);
-  
+
   const loading = vehiclesLoading || logsLoading;
 
   useEffect(() => {
@@ -59,7 +59,7 @@ const VehicleTracking = () => {
             timestamp: locationLog.timestamp,
           } : null,
         };
-        
+
         // Log to check driver data
         console.log('Vehicle data:', vehicleData);
         return vehicleData;

@@ -7,9 +7,17 @@ export interface User {
   first_name: string;
   last_name: string;
   email: string;
-  role: string;
+  role: string | { name: string }; // Role can be expanded object or string ID
   phone_number?: string;
   status: 'active' | 'suspended' | 'archived';
+  avatar?: string;
+  title?: string;
+  description?: string;
+  location?: string;
+  tags?: string[];
+  language?: string;
+  theme?: string;
+  tfa_secret?: string;
 }
 
 export interface DriverProfile {

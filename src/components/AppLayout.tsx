@@ -18,6 +18,7 @@ import {
   User,
 } from 'lucide-react';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useState } from 'react';
 
 interface LayoutProps {
@@ -105,15 +106,28 @@ export const AppLayout = ({ children }: LayoutProps) => {
     return 'Vehicle Tracking';
   };
 
+  const getInitials = () => {
+    if (!user) return 'TR';
+    const first = user.first_name?.charAt(0) || '';
+    const last = user.last_name?.charAt(0) || '';
+    return (first + last).toUpperCase() || 'TR';
+  };
+
+  const getAvatarUrl = () => {
+    if (!user?.avatar) return '';
+    const baseUrl = import.meta.env.VITE_DIRECTUS_URL || 'http://localhost:8055';
+    return `${baseUrl}/assets/${user.avatar}`;
+  };
+
   return (
-    <div className="flex h-screen bg-background">
+    <div className="flex h-screen bg-background flex-col md:flex-row">
       {/* Desktop Sidebar */}
       <aside className="hidden md:flex md:w-64 md:flex-col md:fixed md:inset-y-0 bg-card border-r">
         <NavContent />
       </aside>
 
       {/* Mobile Header */}
-      <header className="md:hidden fixed top-0 left-0 right-0 z-50 bg-card border-b h-16 flex items-center px-4 safe-top">
+      <header className="md:hidden sticky top-0 z-50 bg-card border-b min-h-16 flex items-center px-4 safe-top py-2">
         <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
           <SheetTrigger asChild>
             <Button variant="ghost" size="icon">
@@ -121,7 +135,7 @@ export const AppLayout = ({ children }: LayoutProps) => {
             </Button>
           </SheetTrigger>
           <SheetContent side="left" className="w-64 p-0">
-            <div className="flex flex-col h-full">
+            <div className="flex flex-col h-full safe-top pt-4">
               <NavContent />
             </div>
           </SheetContent>
@@ -130,10 +144,24 @@ export const AppLayout = ({ children }: LayoutProps) => {
           <Truck className="h-5 w-5 text-primary" />
           <h1 className="font-semibold">{getPageTitle()}</h1>
         </div>
+
+        <div className="ml-auto flex items-center gap-2">
+          {user && (
+            <>
+              <span className="text-xs font-medium mr-1">
+                {user.first_name} {user.last_name}
+              </span>
+              <Avatar className="h-8 w-8">
+                <AvatarImage src={getAvatarUrl()} alt={user.first_name} />
+                <AvatarFallback>{getInitials()}</AvatarFallback>
+              </Avatar>
+            </>
+          )}
+        </div>
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 md:ml-64 overflow-y-auto mt-16 md:mt-0">
+      <main className="flex-1 md:ml-64 overflow-y-auto">
         {children}
       </main>
     </div>
