@@ -2,7 +2,7 @@ import { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'com.trackdrive.app',
-  appName: 'Track Drive',
+  appName: 'TRACK DRIVE',
   webDir: 'dist',
   server: {
     androidScheme: 'http',

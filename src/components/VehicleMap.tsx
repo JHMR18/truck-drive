@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -23,7 +23,7 @@ L.Marker.prototype.options.icon = DefaultIcon;
 // Create custom vehicle icons
 const createVehicleIcon = (type: string, status: string) => {
   const color = status === 'Deployed' ? '#ef4444' : status === 'Idle' ? '#22c55e' : '#94a3b8';
-  
+
   const svgIcon = `
     <svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
       <circle cx="20" cy="20" r="18" fill="${color}" stroke="white" stroke-width="3"/>
@@ -53,6 +53,11 @@ interface Vehicle {
     first_name: string;
     last_name: string;
   } | null;
+  current_driver?: {
+    id: string;
+    first_name: string;
+    last_name: string;
+  } | null;
   location?: {
     latitude: number;
     longitude: number;
@@ -61,6 +66,7 @@ interface Vehicle {
 
 interface VehicleMapProps {
   vehicles: Vehicle[];
+  onVehicleSelect?: (vehicle: Vehicle) => void;
 }
 
 // Component to fit map bounds to show all vehicles
@@ -82,7 +88,7 @@ const FitBounds = ({ vehicles }: { vehicles: Vehicle[] }) => {
   return null;
 };
 
-export const VehicleMap = ({ vehicles }: VehicleMapProps) => {
+export const VehicleMap = ({ vehicles, onVehicleSelect }: VehicleMapProps) => {
   // Default center (Tayabas City, Quezon)
   const defaultCenter: [number, number] = [13.9994, 121.5931];
 
@@ -128,31 +134,35 @@ export const VehicleMap = ({ vehicles }: VehicleMapProps) => {
             }}
           >
             <Popup>
-              <div className="p-2">
+              <div className="p-2 min-w-[200px]">
                 <h3 className="font-bold text-lg">{vehicle.plate_number}</h3>
                 <p className="text-sm text-gray-600">{vehicle.type}</p>
-                {vehicle.assigned_driver_id && (
+                {(vehicle.current_driver || vehicle.assigned_driver_id) && (
                   <div className="mt-2 flex items-center gap-1 text-sm">
                     <span className="font-medium">Driver:</span>
                     <span className="text-gray-700">
-                      {vehicle.assigned_driver_id.first_name} {vehicle.assigned_driver_id.last_name}
+                      {vehicle.current_driver
+                        ? `${vehicle.current_driver.first_name} ${vehicle.current_driver.last_name}`
+                        : `${vehicle.assigned_driver_id?.first_name} ${vehicle.assigned_driver_id?.last_name}`
+                      }
                     </span>
                   </div>
                 )}
-                <div className="mt-2">
-                  <span className={`inline-block px-2 py-1 rounded text-xs font-semibold ${
-                    vehicle.status === 'Deployed' 
-                      ? 'bg-red-100 text-red-800' 
-                      : vehicle.status === 'Idle'
-                      ? 'bg-green-100 text-green-800'
-                      : 'bg-gray-100 text-gray-800'
-                  }`}>
-                    {vehicle.status}
-                  </span>
-                </div>
                 <div className="mt-2 text-xs text-gray-500">
                   <p>Lat: {vehicle.location!.latitude.toFixed(6)}</p>
                   <p>Lng: {vehicle.location!.longitude.toFixed(6)}</p>
+                </div>
+
+                <div className="mt-4 pt-2 border-t border-gray-100">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation(); // Prevent map click
+                      onVehicleSelect?.(vehicle);
+                    }}
+                    className="w-full py-1.5 px-3 bg-primary text-primary-foreground text-sm font-medium rounded hover:bg-primary/90 transition-colors"
+                  >
+                    Assign Mission
+                  </button>
                 </div>
               </div>
             </Popup>

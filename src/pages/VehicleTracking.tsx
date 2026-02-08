@@ -10,6 +10,7 @@ import { Truck, RefreshCw, Map as MapIcon, List, Ambulance, MapPin, Activity, Us
 import { BottomNav } from '@/components/BottomNav';
 import { StatusBadge } from '@/components/StatusBadge';
 import { VehicleMap } from '@/components/VehicleMap';
+import { TrackingMissionPanel } from '@/components/TrackingMissionPanel';
 import { cn } from '@/lib/utils';
 
 const VehicleTracking = () => {
@@ -58,6 +59,7 @@ const VehicleTracking = () => {
             heading: locationLog.heading,
             timestamp: locationLog.timestamp,
           } : null,
+          current_driver: locationLog?.driver_id || vehicle.assigned_driver_id,
         };
 
         // Log to check driver data
@@ -202,7 +204,10 @@ const VehicleTracking = () => {
             </CardHeader>
             <CardContent className="p-0">
               <div className="h-[calc(100vh-280px)] min-h-[600px]">
-                <VehicleMap vehicles={filteredVehicles} />
+                <VehicleMap
+                  vehicles={filteredVehicles}
+                  onVehicleSelect={(vehicle) => setSelectedVehicle(vehicle)}
+                />
               </div>
             </CardContent>
           </Card>
@@ -259,6 +264,23 @@ const VehicleTracking = () => {
       </main>
 
       <BottomNav />
+
+      <Sheet open={!!selectedVehicle} onOpenChange={(open) => !open && setSelectedVehicle(null)}>
+        <SheetContent className="overflow-y-auto sm:max-w-md w-full">
+          <SheetHeader>
+            <SheetTitle>Mission Assignment</SheetTitle>
+            <SheetDescription>
+              Assign a new mission to the selected vehicle/driver.
+            </SheetDescription>
+          </SheetHeader>
+          {selectedVehicle && (
+            <TrackingMissionPanel
+              vehicle={selectedVehicle}
+              onClose={() => setSelectedVehicle(null)}
+            />
+          )}
+        </SheetContent>
+      </Sheet>
     </div>
   );
 };
